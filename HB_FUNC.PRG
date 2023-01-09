@@ -1034,7 +1034,7 @@ HB_FUNC( LV_GETCHECKSTATE)
       HWND hWnd = ( HWND ) hb_parnll( 1 );
    #endif
    UINT nRow   = (UINT) hb_parnl (2);
-   hb_retl ( ListView_GetCheckState(hWnd-1, nRow) );
+   hb_retl ( ListView_GetCheckState(hWnd, nRow-1) );
 }
 
 // LV_GETGRIDDISPINFOINDEX(nPtrNMHDR)
@@ -1089,6 +1089,22 @@ HB_FUNC( LV_SETGRIDQUERYIMAGE )
    pDispInfo->item.iImage = hb_parni( 2 );
 }
 
+
+// ListView_GetExtendedStyle ( hWnd, [ nExStyle ] )
+HB_FUNC( LV_GETEXTENDEDSTYLE )
+{
+   #ifndef _WIN64
+      HWND hWnd = ( HWND ) hb_parnl( 1 );
+   #else
+      HWND hWnd = ( HWND ) hb_parnll( 1 );
+   #endif
+   DWORD ExStyle  = (DWORD) hb_parnl  (2);
+   DWORD OldStyle = ListView_GetExtendedListViewStyle (hWnd);
+   if ( HB_ISNUM(2) )
+      hb_retl ((BOOL) ((OldStyle & ExStyle) == ExStyle));
+   else
+      hb_retnl ((LONG) OldStyle);
+}
 
 #pragma ENDDUMP
 
