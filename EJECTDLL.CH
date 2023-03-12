@@ -1,4 +1,6 @@
 
+#define NULL							0
+
 #define SW_HIDE 0
 #define SW_SHOWNORMAL 1
 #define SW_NORMAL 1
@@ -41,4 +43,32 @@
 #define SE_ERR_DDEBUSY                 30 // DDE operation is busy.
 #define SE_ERR_NOASSOC                 31 // File association not available.
 #define SE_ERR_DLLNOTFOUND             32 // Dynamic-link library not found.
+
+#define FSCTL_LOCK_VOLUME              0x00090018
+#define FSCTL_UNLOCK_VOLUME            0x0009001C
+#define FSCTL_DISMOUNT_VOLUME          0x00090020
+
+#define IOCTL_STORAGE_EJECT_MEDIA      0x002D4808  // IOCTL_DISK_EJECT_MEDIA
+#define IOCTL_STORAGE_MEDIA_REMOVAL    0x002D4804
+
+#define FILE_SHARE_READ                   0x00000001
+#define FILE_SHARE_WRITE                  0x00000002
+#define FILE_SHARE_DELETE                 0x00000004
+#define FILE_SHARE_VALID_FLAGS            0x00000007
+
+#define GENERIC_READ                      0x80000000
+#define GENERIC_WRITE                     0x40000000
+#define GENERIC_EXECUTE                   0x20000000
+#define GENERIC_ALL                       0x10000000
+
+#define OPEN_EXISTING                     3
+
+#define DRIVE_UNKNOWN                   0
+#define DRIVE_NO_ROOT_DIR               1
+#define DRIVE_REMOVABLE                 2
+#define DRIVE_FIXED                     3
+#define DRIVE_REMOTE                    4
+#define DRIVE_CDROM                     5
+#define DRIVE_RAMDISK                   6
+
 

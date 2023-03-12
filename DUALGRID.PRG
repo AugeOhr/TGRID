@@ -2,7 +2,7 @@
 *+
 *+ Source Module => c:\fwh\0\LISTVIEW\DUALGRID.PRG
 *+
-*+    Copyright(C) 1983-2022 by Auge & Ohr
+*+    Copyright(C) 1983-2023 by Auge & Ohr
 *+
 *+    Functions: Init Procedure MainInit()
 *+               Procedure Main()
@@ -10,13 +10,15 @@
 *+               Static Procedure DoMyKey()
 *+               Static Procedure BuildMainMenu()
 *+               Static Procedure OpenComboSide()
+*+               Static Procedure OpenConTextMenu()
+*+               Static Procedure OpenTabMenu()
 *+               Static Procedure MakeFNbutton()
 *+               Static Procedure DoResize()
+*+               Static Procedure NoSplash()
 *+               Static Procedure DoSplash()
 *+               Static Procedure NowBuildGrid()
 *+               Static Procedure DlgShow()
 *+               Static Procedure SetTransparent()
-*+               Static Procedure ShowHelp()
 *+               Static Procedure ShowHistory()
 *+               Static Procedure GoHistory()
 *+               Static Procedure MakeNewFolder()
@@ -27,34 +29,34 @@
 *+               Static Procedure OnDeviceChange()
 *+               Static Procedure CompareDir()
 *+               Static Procedure DiffCompare()
-*+               Static Procedure ItemMark()
-*+               Static Procedure ItemUnMark()
-*+               Static Procedure GodMode()
+*+               Static Procedure DoItemMark()
+*+               Static Procedure DoItemUnMark()
 *+               Static Procedure Viewer()
 *+               Static Procedure DoShowDBF()
+*+               Static Procedure HideShow()
 *+               Static Procedure CalliPhone()
 *+               Static Procedure NewTab()
 *+               Static Procedure DelThisTab()
 *+               Static Procedure UpDateInfo()
+*+               Static Procedure NewActiveIcon()
 *+               Static Function DoClose()
 *+               Static Function DoEndProco()
 *+               Static Function GetAllDrive()
-*+               Static Function BitsToDrive()
-*+               Static Function WinExeError()
 *+               Static Function Diskfree()
 *+               Static Function DoSH3func()
 *+               Static Function ShellFiles()
 *+               Static Function NetConnect()
 *+               Static Function NetDisconnect()
+*+               Static Function CopyToClipboard()
+*+               Static Function TextFromClipboard()
+*+               Static Function IsFileInPath()
 *+               Procedure MakeTop()
 *+               Procedure SnapToCtrl()
 *+               Procedure SayBar()
 *+               Procedure GoSpecialFolder()
 *+               Procedure GoFindFile()
 *+               Procedure SearchRecursive()
-*+               Function NumColor2RGB()
-*+               Function SysColor2Num()
-*+               Function RGB2Num()
+*+               Function Num2RGB()
 *+               Function ColorDialog()
 *+               Function HMS2Sec()
 *+               Function CompareFile()
@@ -66,41 +68,43 @@
 *+               Function EndwithSlash()
 *+               Function AtInside()
 *+               Function FillDriveArray()
+*+               Function My_Directory()
 *+               Function VAR2CHAR()
 *+               Function onDummy()
 *+               Class TExplorer
 *+               Procedure TAB_CHANGE_LEFT()
 *+               Procedure TAB_CHANGE_RIGHT()
+*+               Class TMyWindow
 *+
 *+       Tables: USE (cPath+cFile) NEW VIA "DBFCDX" EXCLUSIVE
 *+
-*+    Reformatted by Click! 2.05.40 on Jan-7-2023 at  1:29 am
+*+    Reformatted by Click! 2.05.40 on Mar-11-2023 at  8:21 am
 *+
 *+--------------------------------------------------------------------
 
 #include "FiveWin.ch"
-#include "Directry.ch"
+#include "Directry.CH"
 #include "fileio.ch"
 #include "COMMON.CH"
 #include "Splitter.ch"
+#include "wcolors.ch"
+#include "hbthread.ch"
 
 #include "DUALGRID.CH"
 #include "TGRID.CH"
-//  #include "CSIDL.CH"
+
+//  #define Use_SEQUENCE                           // lost Color of highlight Bar
+#define BROADCAST_QUERY_DENY  0x424D5144
 
 #xtranslate aDir_Left      => Stack_Left\[nDimLeft, 1]
-#xtranslate _cGrid_Left     => Stack_Left\[nDimLeft, 2]
-#xtranslate _oCombo_Left    => Stack_Left\[nDimLeft, 3]
-#xtranslate oExpl_Left     => Stack_Left\[nDimLeft, 4]
-#xtranslate oTab_Left      => Stack_Left\[nDimLeft, 5]
-#xtranslate cPath_Left     => Stack_Left\[nDimLeft, 6]
+#xtranslate oExpl_Left     => Stack_Left\[nDimLeft, 2]
+#xtranslate oTab_Left      => Stack_Left\[nDimLeft, 3]
+#xtranslate cPath_Left     => Stack_Left\[nDimLeft, 4]
 
 #xtranslate aDir_Right     => Stack_Right\[nDimRight, 1]
-#xtranslate _cGrid_Right    => Stack_Right\[nDimRight, 2]
-#xtranslate _oCombo_Right   => Stack_Right\[nDimRight, 3]
-#xtranslate oExpl_Right    => Stack_Right\[nDimRight, 4]
-#xtranslate oTab_Right     => Stack_Right\[nDimRight, 5]
-#xtranslate cPath_Right    => Stack_Right\[nDimRight, 6]
+#xtranslate oExpl_Right    => Stack_Right\[nDimRight, 2]
+#xtranslate oTab_Right     => Stack_Right\[nDimRight, 3]
+#xtranslate cPath_Right    => Stack_Right\[nDimRight, 4]
 
 REQUEST DBFCDX
 REQUEST DBFNTX
@@ -124,139 +128,176 @@ REQUEST HB_LANG_CSWIN
 *
 ********************************************/
 
-//  REQUEST HB_LANG_ES
-//  REQUEST HB_LANG_EN
-//  REQUEST HB_LANG_FR
-//  REQUEST HB_LANG_PT
+REQUEST HB_LANG_ES
+REQUEST HB_LANG_EN
+REQUEST HB_LANG_FR
+REQUEST HB_LANG_PT
 REQUEST HB_LANG_DEWIN
-//  REQUEST HB_LANG_RUWIN
-//  REQUEST HB_LANG_IT
-//  REQUEST HB_LANG_PLWIN
-//  REQUEST HB_LANG_EU
-//  REQUEST HB_LANG_HR852
-//  REQUEST HB_LANG_SLWIN
-//  REQUEST HB_LANG_CSWIN
+REQUEST HB_LANG_RUWIN
+REQUEST HB_LANG_IT
+REQUEST HB_LANG_PLWIN
+REQUEST HB_LANG_EU
+REQUEST HB_LANG_HR852
+REQUEST HB_LANG_SLWIN
+REQUEST HB_LANG_CSWIN
 
-//  REQUEST HB_CODEPAGE_BG866
-//  REQUEST HB_CODEPAGE_BGISO
-//  REQUEST HB_CODEPAGE_BGMIK
-//  REQUEST HB_CODEPAGE_BGWIN
-//  REQUEST HB_CODEPAGE_CS852
-//  REQUEST HB_CODEPAGE_CS852C
-//  REQUEST HB_CODEPAGE_CSISO
-//  REQUEST HB_CODEPAGE_CSKAMC
-//  REQUEST HB_CODEPAGE_CSWIN
+REQUEST HB_CODEPAGE_BG866
+REQUEST HB_CODEPAGE_BGISO
+REQUEST HB_CODEPAGE_BGMIK
+REQUEST HB_CODEPAGE_BGWIN
+REQUEST HB_CODEPAGE_CS852
+REQUEST HB_CODEPAGE_CS852C
+REQUEST HB_CODEPAGE_CSISO
+REQUEST HB_CODEPAGE_CSKAMC
+REQUEST HB_CODEPAGE_CSWIN
 REQUEST HB_CODEPAGE_DE850
 REQUEST HB_CODEPAGE_DE850M
 REQUEST HB_CODEPAGE_DEISO
 REQUEST HB_CODEPAGE_DEWIN
-//  REQUEST HB_CODEPAGE_DK865
-//  REQUEST HB_CODEPAGE_EL437
-//  REQUEST HB_CODEPAGE_EL737
-//  REQUEST HB_CODEPAGE_ELISO
-//  REQUEST HB_CODEPAGE_ELWIN
-//  REQUEST HB_CODEPAGE_EN
-//  REQUEST HB_CODEPAGE_ES850
-//  REQUEST HB_CODEPAGE_ES850C
-//  REQUEST HB_CODEPAGE_ES850M
-//  REQUEST HB_CODEPAGE_ESISO
-//  REQUEST HB_CODEPAGE_ESMWIN
-//  REQUEST HB_CODEPAGE_ESWIN
-//  REQUEST HB_CODEPAGE_FI850
-//  REQUEST HB_CODEPAGE_FR850
-//  REQUEST HB_CODEPAGE_FR850C
-//  REQUEST HB_CODEPAGE_FR850M
-//  REQUEST HB_CODEPAGE_FRISO
-//  REQUEST HB_CODEPAGE_FRWIN
-//  REQUEST HB_CODEPAGE_HE862
-//  REQUEST HB_CODEPAGE_HEWIN
-//  REQUEST HB_CODEPAGE_HR646
-//  REQUEST HB_CODEPAGE_HR852
-//  REQUEST HB_CODEPAGE_HRISO
-//  REQUEST HB_CODEPAGE_HRWIN
-//  REQUEST HB_CODEPAGE_HU852
-//  REQUEST HB_CODEPAGE_HU852C
-//  REQUEST HB_CODEPAGE_HUISO
-//  REQUEST HB_CODEPAGE_HUWIN
-//  REQUEST HB_CODEPAGE_IS850
-//  REQUEST HB_CODEPAGE_IS861
-//  REQUEST HB_CODEPAGE_IT437
-//  REQUEST HB_CODEPAGE_IT850
-//  REQUEST HB_CODEPAGE_IT850M
-//  REQUEST HB_CODEPAGE_ITISB
-//  REQUEST HB_CODEPAGE_ITISO
-//  REQUEST HB_CODEPAGE_ITWIN
-//  REQUEST HB_CODEPAGE_LT775
-//  REQUEST HB_CODEPAGE_LTWIN
-//  REQUEST HB_CODEPAGE_NL850
-//  REQUEST HB_CODEPAGE_NL850M
-//  REQUEST HB_CODEPAGE_NO865
-//  REQUEST HB_CODEPAGE_PL852
-//  REQUEST HB_CODEPAGE_PLISO
-//  REQUEST HB_CODEPAGE_PLMAZ
-//  REQUEST HB_CODEPAGE_PLWIN
-//  REQUEST HB_CODEPAGE_PT850
-//  REQUEST HB_CODEPAGE_PT860
-//  REQUEST HB_CODEPAGE_PTISO
-//  REQUEST HB_CODEPAGE_RO852
-//  REQUEST HB_CODEPAGE_ROISO
-//  REQUEST HB_CODEPAGE_ROWIN
-//  REQUEST HB_CODEPAGE_RU1251
-//  REQUEST HB_CODEPAGE_RU866
-//  REQUEST HB_CODEPAGE_RUISO
-//  REQUEST HB_CODEPAGE_RUKOI8
-//  REQUEST HB_CODEPAGE_SK852
-//  REQUEST HB_CODEPAGE_SK852C
-//  REQUEST HB_CODEPAGE_SKISO
-//  REQUEST HB_CODEPAGE_SKKAMC
-//  REQUEST HB_CODEPAGE_SKWIN
-//  REQUEST HB_CODEPAGE_SL646
-//  REQUEST HB_CODEPAGE_SL852
-//  REQUEST HB_CODEPAGE_SLISO
-//  REQUEST HB_CODEPAGE_SLWIN
-//  REQUEST HB_CODEPAGE_SR646
-//  REQUEST HB_CODEPAGE_SR646C
-//  REQUEST HB_CODEPAGE_SRWIN
-//  REQUEST HB_CODEPAGE_SV437C
-//  REQUEST HB_CODEPAGE_SV850
-//  REQUEST HB_CODEPAGE_SV850M
-//  REQUEST HB_CODEPAGE_SVISO
-//  REQUEST HB_CODEPAGE_SVWIN
-//  REQUEST HB_CODEPAGE_TR857
-//  REQUEST HB_CODEPAGE_TRISO
-//  REQUEST HB_CODEPAGE_TRWIN
-//  REQUEST HB_CODEPAGE_UA1125
-//  REQUEST HB_CODEPAGE_UA1251
-//  REQUEST HB_CODEPAGE_UA866
-//  REQUEST HB_CODEPAGE_UAKOI8
-//  REQUEST HB_CODEPAGE_UTF16LE
-//  REQUEST HB_CODEPAGE_UTF8
-//  REQUEST HB_CODEPAGE_UTF8EX
+REQUEST HB_CODEPAGE_DK865
+REQUEST HB_CODEPAGE_EL437
+REQUEST HB_CODEPAGE_EL737
+REQUEST HB_CODEPAGE_ELISO
+REQUEST HB_CODEPAGE_ELWIN
+REQUEST HB_CODEPAGE_EN
+REQUEST HB_CODEPAGE_ES850
+REQUEST HB_CODEPAGE_ES850C
+REQUEST HB_CODEPAGE_ES850M
+REQUEST HB_CODEPAGE_ESISO
+REQUEST HB_CODEPAGE_ESMWIN
+REQUEST HB_CODEPAGE_ESWIN
+REQUEST HB_CODEPAGE_FI850
+REQUEST HB_CODEPAGE_FR850
+REQUEST HB_CODEPAGE_FR850C
+REQUEST HB_CODEPAGE_FR850M
+REQUEST HB_CODEPAGE_FRISO
+REQUEST HB_CODEPAGE_FRWIN
+REQUEST HB_CODEPAGE_HE862
+REQUEST HB_CODEPAGE_HEWIN
+REQUEST HB_CODEPAGE_HR646
+REQUEST HB_CODEPAGE_HR852
+REQUEST HB_CODEPAGE_HRISO
+REQUEST HB_CODEPAGE_HRWIN
+REQUEST HB_CODEPAGE_HU852
+REQUEST HB_CODEPAGE_HU852C
+REQUEST HB_CODEPAGE_HUISO
+REQUEST HB_CODEPAGE_HUWIN
+REQUEST HB_CODEPAGE_IS850
+REQUEST HB_CODEPAGE_IS861
+REQUEST HB_CODEPAGE_IT437
+REQUEST HB_CODEPAGE_IT850
+REQUEST HB_CODEPAGE_IT850M
+REQUEST HB_CODEPAGE_ITISB
+REQUEST HB_CODEPAGE_ITISO
+REQUEST HB_CODEPAGE_ITWIN
+REQUEST HB_CODEPAGE_LT775
+REQUEST HB_CODEPAGE_LTWIN
+REQUEST HB_CODEPAGE_NL850
+REQUEST HB_CODEPAGE_NL850M
+REQUEST HB_CODEPAGE_NO865
+REQUEST HB_CODEPAGE_PL852
+REQUEST HB_CODEPAGE_PLISO
+REQUEST HB_CODEPAGE_PLMAZ
+REQUEST HB_CODEPAGE_PLWIN
+REQUEST HB_CODEPAGE_PT850
+REQUEST HB_CODEPAGE_PT860
+REQUEST HB_CODEPAGE_PTISO
+REQUEST HB_CODEPAGE_RO852
+REQUEST HB_CODEPAGE_ROISO
+REQUEST HB_CODEPAGE_ROWIN
+REQUEST HB_CODEPAGE_RU1251
+REQUEST HB_CODEPAGE_RU866
+REQUEST HB_CODEPAGE_RUISO
+REQUEST HB_CODEPAGE_RUKOI8
+REQUEST HB_CODEPAGE_SK852
+REQUEST HB_CODEPAGE_SK852C
+REQUEST HB_CODEPAGE_SKISO
+REQUEST HB_CODEPAGE_SKKAMC
+REQUEST HB_CODEPAGE_SKWIN
+REQUEST HB_CODEPAGE_SL646
+REQUEST HB_CODEPAGE_SL852
+REQUEST HB_CODEPAGE_SLISO
+REQUEST HB_CODEPAGE_SLWIN
+REQUEST HB_CODEPAGE_SR646
+REQUEST HB_CODEPAGE_SR646C
+REQUEST HB_CODEPAGE_SRWIN
+REQUEST HB_CODEPAGE_SV437C
+REQUEST HB_CODEPAGE_SV850
+REQUEST HB_CODEPAGE_SV850M
+REQUEST HB_CODEPAGE_SVISO
+REQUEST HB_CODEPAGE_SVWIN
+REQUEST HB_CODEPAGE_TR857
+REQUEST HB_CODEPAGE_TRISO
+REQUEST HB_CODEPAGE_TRWIN
+REQUEST HB_CODEPAGE_UA1125
+REQUEST HB_CODEPAGE_UA1251
+REQUEST HB_CODEPAGE_UA866
+REQUEST HB_CODEPAGE_UAKOI8
+REQUEST HB_CODEPAGE_UTF16LE
+REQUEST HB_CODEPAGE_UTF8
+REQUEST HB_CODEPAGE_UTF8EX
 
-STATIC lDebug       := .T.
-STATIC aHistory     := {}
-STATIC cDeviceEvent := ""
-STATIC acBitmaps    := {}                                             // for ComboBox
-STATIC acItem       := {}                                             // Image Combobox
-STATIC acType       := {}
-STATIC nFirstUSB    := 0
-STATIC nIcoLarge    := 32                                             // 256
-STATIC nIcoSmall    := 16                                             // 32
-//  STATIC aSearchItems := {}
-//  STATIC hDLL
+// no_more STATIC cDeviceEvent := ""
+STATIC aHistory  := {}
+STATIC acBitmaps := {}                                                // for ComboBox
+STATIC acItem    := {}                                                // Image Combobox
+STATIC acType    := {}
+STATIC nFirstUSB := 0
+STATIC nIcoLarge := 32                                                // 256
+STATIC nIcoSmall := 16                                                // 32
+STATIC nPercent  := 50
+
+STATIC lUse_Explorer  := .T.
+STATIC lUse_Splitter  := .F.
+STATIC lUse_TFolderEx := .F.
+STATIC lUse_BTNBMP    := .F.
+STATIC lUse_IconEx    := .F.
+
 STATIC oCombo_Left
 STATIC oCombo_Right
 STATIC oVol_Left
 STATIC oVol_Right
-STATIC l_Every      := .F.
-STATIC l_InText     := .F.
-STATIC l_InZip      := .F.
 
-STATIC cVersion := "v0.1.86"
+STATIC cVersion := "v0.2.16"
 
 // ***************************************************************************
+//
+//  11.03.2023 v0.2.16 METHOD RefreshAttr() missing new Araay Element LV_EXT
+//  10.03.2023 v0.2.15 all default .F. use Parameter
+//  05.03.2023 v0.2.14 #IFDEF Use_*** -> STATIC
+//  04.03.2023 v0.2.13 IPhone.PRG was not using My_Directory() Structure
+//
+//  2nd Pre-RELEASE
+//
+//  03.03.2023 v0.2.12 My_Directory() -> 6 Column
+//  02.03.2023 v0.2.11 better ImageThread() (Zero-based) - Option /S ingle Thread
+//  01.03.2023 v0.2.10 oTab:SetFocus() .> crash at Start
+//  28.02.2023 v0.2.09 Method ImageThread() instead of FUNCTION for Thread
+//  27.02.2023 v0.2.08 using BCC  32 Bit and -mt
+//  26.02.2023 v0.2.07 using MSVC 64 Bit and -mt
+//  25.02.2023 v0.2.06 FUNCTION ImageThread() instead of Method for Thread
+//  24.02.2023 v0.2.05 oMain:bGotFocus
+//  23.02.2023 v0.2.04 Default Option of TGrid demonstrate in CLASS TExplorer
+//  22.02.2023 v0.2.03 no_more oSayActive
+//  21.02.2023 v0.2.02 CLASS TMsgBar() instead of STATUSBAR
+//  20.02.2023 v0.2.01 HB_FUNC( HEADER_SETCOLOR ) Customdraw
+//  16.02.2023 v0.2.00 BTNBMP Darkmode instead of TButton (still avaiable)
+//  15.02.2023 v0.1.99 clean-up : no Bitmap for TGrid-Header only Icon
+//  14.02.2023 v0.1.98 Grid-Header Icon from Window "\System32\NetShell.dll"
+//  12.02.2023 v0.1.97 active TAB Red Icon
+//  11.02.2023 v0.1.96 Resize each TAB (Expl_* / Grid )
+//  10.02.2023 v0.1.95 Grid-Header Icon up/down
+//  07.02.2023 v0.1.94 Dark-Mode TAB of TFolderEx() / UpDateInfo()
+//  31.01.2023 v0.1.93 TFolderEx() / TFolder()
+//  15.01.2023 v0.1.92 LV_INITLISTVIEW()
+//  14.01.2023 v0.1.91 METHOD SetTopItem()
+//  11.01.2023 v0.1.90 "virtual" Checkbox ::aMarked / LV_HITTEST()
+//  10.01.2023 v0.1.89 "virtual" Grid Checkbox
+//  09.01.2023 v0.1.88 rename ::lChecked -> ::lUseUmage / add ::lUseCheckBox
+//  08.01.2023 v0.1.87 Checkbox Icon Mode / LVIS_CHECKED / Getdata()
 //  07.01.2023 v0.1.86 SHOWFILEPROPERTIES crash with SkinButtons()
-//  06.01.2023 v0.1.85 PDF & clean-up CODE
+//
+//  06.01.2023 v0.1.85 PDF & clean-up CODE / Github RELEASE
 //  05.01.2023 v0.1.84 LVS_OWNERDATA use in ShowMoreProperty()
 //
 //  31.12.2022 v0.1.82 RECUDIRS() if not Everything
@@ -283,7 +324,7 @@ STATIC cVersion := "v0.1.86"
 //  22.11.2022 v0.1.61 Everything Search
 //  21.11.2022 v0.1.60 F2 CSIDL Folder / HB_FUNC( C_GETSPECIALFOLDER )
 //  20.11.2022 v0.1.59 USB-Stick DBT_DEVICEARRIVAL / DBT_DEVICEREMOVECOMPLETE
-//  19.11.2022 v0.1.58 TGrid:ClearAndFillDir( oDlg ) / SetGridHeaderSort( nCol )
+//  19.11.2022 v0.1.58 TGrid:ClearAndFillDir( oDlg )
 //  18.11.2022 v0.1.57 F11 FuncMSCFolder()
 //  17.11.2022 v0.1.56 go64 MSVC 64 Bit
 //  16.11.2022 v0.1.55 using *.MAK BCC7, Windows Attribut
@@ -315,7 +356,7 @@ STATIC cVersion := "v0.1.86"
 
 MEMVAR oMain
 MEMVAR oStatusBar
-MEMVAR oSayActive
+// no_more MEMVAR oSayActive
 MEMVAR aWin
 MEMVAR Stack_Left
 MEMVAR Stack_Right
@@ -327,6 +368,7 @@ MEMVAR oFontBig
 MEMVAR nFontBig
 MEMVAR BFcolor, BGcolor
 MEMVAR aMeta
+MEMVAR bGradient
 
 *+--------------------------------------------------------------------
 *+
@@ -355,23 +397,58 @@ RETURN
 *+
 PROCEDURE Main()
 
-LOCAL cPath      := hb_Dirbase()
-LOCAL nWidth     := 1280
-LOCAL nHeight    := 1024
-LOCAL nTop       := 0
-LOCAL nLeft      := 0
-LOCAL cLog       := cFileSetExt( ExeName(), "LOG" )
-LOCAL nPart      := nWidth / nUseButton
-LOCAL nFontSize  := 20
-LOCAL aButton    := {}                                                // Array Fx Buttons
-LOCAL cSayActive := ""
-LOCAL lRet       := .T.
+LOCAL lUse_Thread := .F.
+LOCAL lUse_Debug  := .F.
+LOCAL cPath       := hb_Dirbase()
+LOCAL nWidth      := 1280
+LOCAL nHeight     := 1024
+LOCAL nTop        := 0
+LOCAL nLeft       := 0
+LOCAL lPixel      := .T.
+LOCAL lDesign     := .F.
+LOCAL cLog        := cFileSetExt( ExeName(), "LOG" )
+LOCAL nPart       := nWidth / nUseButton
+LOCAL nFontSize   := 20
+LOCAL aButton     := {}                                               // Array Fx Buttons
+LOCAL cSayActive  := ""
+LOCAL lRet        := .T.
+LOCAL cVol_Left   := ""
+LOCAL cVol_Right  := ""
+LOCAL lCheckbox   := .F.
+LOCAL lDispInfo   := .F.                                              // Ownerdraw only ANSI
 LOCAL oSplit, aRect
 LOCAL nSizeType
 LOCAL oRootLeft, oRootRight, oUpLeft, oUpRight
-LOCAL cVol_Left  := ""
-LOCAL cVol_Right := ""
 LOCAL oFontSmall
+LOCAL oSkinB, cMYDRIVE16
+LOCAL hDC, nMax, ii, xPara
+
+   // TFolderEx
+LOCAL aPrompts      := { "Start" }
+LOCAL aBitmaps      := { "MYTRANSPARENT" }
+LOCAL oFont
+LOCAL nFolderHeight := 25
+LOCAL aHelps
+LOCAL nRound        := 3
+LOCAL bAction
+LOCAL bClrTabs
+LOCAL bClrText
+LOCAL aAlign
+LOCAL lAdjust       := .F.
+LOCAL nSeparator    := 3
+LOCAL nOption       := 1
+LOCAL bPopUp
+LOCAL lStretch      := .F.
+LOCAL cLayOut       := "TOP"
+LOCAL bBmpAction
+LOCAL nBright       := 0
+LOCAL lAnimate      := .F.
+LOCAL nSpeed
+LOCAL lTransparent  := .F.
+LOCAL aDialogs
+LOCAL lBorder       := .T.
+LOCAL nClrPane      := CLR_WHITE
+LOCAL cVarName
 
    //------------------------------ CONFIG.INI -------------------------------
 
@@ -396,16 +473,21 @@ LOCAL cIcoSmall    := "16"
 LOCAL cBGcolor
 LOCAL cBFcolor
 
+LOCAL cSplitter := "YES"
+LOCAL cTFolder  := "YES"
+LOCAL cBTNBMP   := "YES"
+LOCAL cIconEx   := "YES"
+
    //-------------------------------------------------------------------------
 
+   // no_more PRIVATE oSayActive
 PRIVATE oMain
 PRIVATE oStatusBar
 PRIVATE oFontDefault
 PRIVATE oFontBig
-PRIVATE oSayActive
-PRIVATE nFontBig     := 20
-PRIVATE BGcolor      := RGB( 000, 000, 001 )                          // CLR_BLACK
-PRIVATE BFcolor      := RGB( 025, 254, 255 )                          // CLR_CYAN
+PRIVATE nFontBig   := 20
+PRIVATE BGcolor    := RGB( 000, 000, 001 )                            // CLR_BLACK
+PRIVATE BFcolor    := RGB( 025, 254, 255 )                            // CLR_CYAN
 
 PUBLIC aWin        := {}                                              // hold all Window
 PUBLIC Stack_Left  := {}                                              // Array Tab / Grid left
@@ -413,63 +495,152 @@ PUBLIC Stack_Right := {}                                              // Array T
 PUBLIC nDimLeft    := 0                                               // Layer in 2-DIM Array left
 PUBLIC nDimRight   := 0                                               // Layer in 2-DIM Array right
 PUBLIC nGridFocus  := 1                                               // 1=left, 2=right
+PUBLIC bGradient
 
-   //  #define Use_Debug
-#IFDEF Use_Debug
-   SET ALTER ON
-   SET ALTER TO "_LOGIT2.TXT "
-#ENDIF
+   IF !hb_mtvm()
+      MSGSTOP( "There is no support for multi-threading" )
+      //      QUIT
+   ENDIF
+   lUse_Thread := hb_mtvm()
 
+   nMax := PCOUNT()
+   IF nMax > 0
+      FOR ii := 1 TO nMax
+         xPara := UPPER( Pvalue( ii ) )
+         DO CASE
+            CASE xPara = "/D"                                         // enable Ondummy() Logfile
+               lUse_Debug     := .T.
+
+            CASE xPara = "/S"                                         // disable Thread()
+               lUse_Thread    := .F.
+
+            CASE xPara = "/B"                                         // enable BTMBMP() and use TButton()
+               lUse_BTNBMP    := .T.
+
+            CASE xPara = "/F"                                         // enable TFolderEx() and use TFolder()
+               lUse_TFolderEx := .T.
+
+            CASE xPara = "/T"                                         // enable SPLITTER
+               lUse_Splitter  := .T.
+
+            CASE xPara = "/I"                                         // enable read System Icon for Combobox
+               lUse_IconEx    := .T.
+
+         ENDCASE
+      NEXT
+
+   ENDIF
+
+   IF lUse_Debug
+      SET ALTER ON
+      SET ALTER TO "_LOGIT2.TXT "
+   ENDIF
+
+   // Note : Unicode .T. does "block" notify Event LVN_GETDISPINFO
    FW_SetUnicode( .T. )                                               // use UniCode
 
    //------------------------------ load INI   -------------------------------
 
-   cBGcolor := BGcolor
-   cBFcolor := BFcolor
+   cBGcolor    := BGcolor
+   cBFcolor    := BFcolor
 
-   LoadConfig( @cRow, @cCol, @cWidth, @cHeight, @cFontSize, @cFontBig, @cTranslateCP, @cTransparent, @cLangCode, @cCodepage, @cStartLeft, @cStartRight, @cImageLeft, @cImageRight, @cVIEWLeft, @cVIEWRight, @cIcoLarge, @cIcoSmall, @cBGcolor, @cBFcolor )
+   LoadConfig( @cRow, @cCol, @cWidth, @cHeight, @cFontSize, @cFontBig, @cTranslateCP, ;
+               @ cTransparent, @cLangCode, @cCodepage, @cStartLeft, @cStartRight, ;
+               @cImageLeft, @cImageRight, @cVIEWLeft, @cVIEWRight, @cIcoLarge, ;
+               @cIcoSmall, @cBGcolor, @cBFcolor,@cSplitter,@cTFolder,@cBTNBMP,@cIconEx )
 
-   BGcolor := cBGcolor
-   BFcolor := cBFcolor
+   BGcolor     := cBGcolor
+   BFcolor     := cBFcolor
 
-   nWidth := VAL( cWidth )
-   nHeight := VAL( cHeight )
-   nTop := VAL( cRow )
-   nLeft := VAL( cCol )
-   nFontSize := VAL( cFontSize )
-   nFontBig := VAL( cFontBig )
-   nIcoLarge := VAL( cIcoLarge )
-   nIcoSmall := VAL( cIcoSmall )
+   bGradient   := { | lInvert | IF( lInvert, ;
+                  { ;
+                  { 0.10, nRGB( 255, 215, 0 ), nRGB( 205, 173, 0 ) }, ;
+                  { 0.90, BGcolor, BGcolor } ;
+                  }, ;
+                  { ;
+                  { 0.20, nRGB( 192, 192, 192 ), BGcolor }, ;
+                  { 0.80, BGcolor, BGcolor } ;
+                  } ) }
+
+   nWidth      := VAL( cWidth )
+   nHeight     := VAL( cHeight )
+   nTop        := VAL( cRow )
+   nLeft       := VAL( cCol )
+   nFontSize   := VAL( cFontSize )
+   nFontBig    := VAL( cFontBig )
+   nIcoLarge   := VAL( cIcoLarge )
+   nIcoSmall   := VAL( cIcoSmall )
    hb_LangSelect( cLangCode )
    hb_CDPSELECT( cCodepage )
-   // hb_CDPSELECT( "UTF8")
+
+   IF lUse_Splitter = .F.
+      IF EMPTY(cSplitter)
+         lUse_Splitter := .F.
+      ELSE
+         IF UPPER(cSplitter) = "YES"
+            lUse_Splitter := .T.
+         ENDIF
+      ENDIF
+   ENDIF
+
+   IF lUse_TFolderEx = .F.
+      IF EMPTY(cTFolder)
+         lUse_TFolderEx := .F.
+      ELSE
+         IF UPPER(cTFolder) = "YES"
+            lUse_TFolderEx := .T.
+         ENDIF
+      ENDIF
+   ENDIF
+
+   IF lUse_BTNBMP = .F.
+      IF EMPTY(cBTNBMP)
+         lUse_BTNBMP := .F.
+      ELSE
+         IF UPPER(cBTNBMP) = "YES"
+            lUse_BTNBMP := .T.
+         ENDIF
+      ENDIF
+   ENDIF
+
+
+   IF lUse_IconEx    = .F.
+      IF EMPTY(cIconEx)
+         lUse_IconEx := .F.
+      ELSE
+         IF UPPER(cIconEx) = "YES"
+            lUse_IconEx := .T.
+         ENDIF
+      ENDIF
+   ENDIF
+
 
    //-------------------------------------------------------------------------
 
    SET DATE GERMAN
    SET CENTURY ON
-   //    FWLOG "Start"
+   FWLOG "Start"
 
-   AADD( Stack_Left, ARRAY( 6 ) )
-   nDimLeft := LEN( Stack_Left )
-   cPath_Left := cStartLeft
+   AADD( Stack_Left, ARRAY( 4 ) )
+   nDimLeft    := LEN( Stack_Left )
+   cPath_Left  := cStartLeft
 
-   AADD( Stack_Right, ARRAY( 6 ) )
-   nDimRight := LEN( Stack_Right )
+   AADD( Stack_Right, ARRAY( 4 ) )
+   nDimRight   := LEN( Stack_Right )
    cPath_Right := cStartRight
 
-   aDir_Left := DIRECTORY( cStartLeft + "*.*", "DHS" )
-   aDir_Right := DIRECTORY( cStartRight + "*.*", "DHS" )
+   aDir_Left   := My_Directory( cStartLeft + "*.*", "DHS" )
+   aDir_Right  := My_Directory( cStartRight + "*.*", "DHS" )
 
    GetAllDrive()
 
-   //  SkinButtons() // crash with HB_FUNC(SHOWFILEPROPERTIES)
+   SET _3DLOOK ON
 
    DEFINE FONT oFontBig NAME "TAHOMA" SIZE 0, - nFontBig
       ACTIVATE FONT oFontBig
       DEFINE FONT oFontDefault NAME "TAHOMA" SIZE 0, - nFontSize
          ACTIVATE FONT oFontDefault
-         DEFINE FONT oFontSmall NAME "TAHOMA" SIZE 0, - nFontSize / 3 * 2
+         DEFINE FONT oFontSmall NAME "TAHOMA" SIZE 0, - nFontSize / 4 * 3
             ACTIVATE FONT oFontSmall
 
 #IFDEF __HMG__
@@ -483,57 +654,119 @@ PUBLIC nGridFocus  := 1                                               // 1=left,
       oMain:lVisible := .F.
       oMain:hide()
 
-      @ nHeight - 160, 10 SAY oSayActive PROMPT cSayActive FONT oFontDefault SIZE nWidth - 20, 30 PIXEL OF oMain         
+      // no_more      @ nHeight - 162, 10 SAY oSayActive PROMPT cSayActive FONT oFontDefault SIZE nWidth - 20, 26 PIXEL OF oMain
 
-      oRootLeft := TButton() :new( 4, ( nWidth / 2 ) - 74, " \", oMain,, 32, 32,, oFontDefault,, .T. )
-      oUpLeft := TButton() :new( 4, ( nWidth / 2 ) - 40, "..", oMain,, 32, 32,, oFontDefault,, .T. )
+      IF lUse_BTNBMP = .T.
+         @  4, ( nWidth / 2 ) - 74 - 20 BTNBMP oRootLeft SIZE 40, 32 PIXEL OF oMain ;
+                 PROMPT "\" CENTER ;
+                 ACTION( nGridFocus := 1, oExpl_Left:DoNextFolder( SUBSTR( oExpl_Left:oGrid:cPath, 1, 3 ) ) ) FONT oFontDefault COLOR BFcolor, BGcolor
+         oRootLeft:bClrGrad := bGradient
 
-      oRootRight := TButton() :new( 4, ( nWidth ) - 84, " \", oMain,, 32, 32,, oFontDefault,, .T. )
-      oUpRight := TButton() :new( 4, ( nWidth ) - 50, "..", oMain,, 32, 32,, oFontDefault,, .T. )
+         @  4, ( nWidth / 2 ) - 40 - 10 BTNBMP oUpLeft SIZE 40, 32 PIXEL OF oMain ;
+                 PROMPT ".." CENTER ;
+                 ACTION( nGridFocus := 1, oExpl_Left:DoLastFolder( TRIM( oExpl_Left:oGrid:cPath ) ) ) FONT oFontDefault COLOR BFcolor, BGcolor
+         oUpLeft:bClrGrad := bGradient
+
+         @  4, ( nWidth ) - 84 - 20 BTNBMP oRootRight SIZE 40, 32 PIXEL OF oMain ;
+                 PROMPT "\" CENTER ;
+                 ACTION( nGridFocus := 2, oExpl_Right:DoNextFolder( SUBSTR( oExpl_Right:oGrid:cPath, 1, 3 ) ) ) FONT oFontDefault COLOR BFcolor, BGcolor
+         oRootRight:bClrGrad := bGradient
+
+         @  4, ( nWidth ) - 50 - 10 BTNBMP oUpRight SIZE 40, 32 PIXEL OF oMain ;
+                 PROMPT ".." CENTER ;
+                 ACTION( nGridFocus := 2, oExpl_Right:DoLastFolder( TRIM( oExpl_Right:oGrid:cPath ) ) ) FONT oFontDefault COLOR BFcolor, BGcolor
+         oUpRight:bClrGrad := bGradient
+
+      ELSE
+         oRootLeft  := TButtonBmp() :new( 4, ( nWidth / 2 ) - 74 - 20, " \", oMain,, 40, 32,, oFontDefault,, .T. )
+         oUpLeft    := TButtonBmp() :new( 4, ( nWidth / 2 ) - 40 - 10, "..", oMain,, 40, 32,, oFontDefault,, .T. )
+
+         oRootRight := TButtonBmp() :new( 4, ( nWidth ) - 84 - 20, " \", oMain,, 40, 32,, oFontDefault,, .T. )
+         oUpRight   := TButtonBmp() :new( 4, ( nWidth ) - 50 - 10, "..", oMain,, 40, 32,, oFontDefault,, .T. )
+      ENDIF
 
       __ChangeStyleWindow( oRootLeft:hWnd, WS_TABSTOP,, .F. )
       __ChangeStyleWindow( oUpLeft :hWnd, WS_TABSTOP,, .F. )
       __ChangeStyleWindow( oRootRight:hWnd, WS_TABSTOP,, .F. )
       __ChangeStyleWindow( oUpRight :hWnd, WS_TABSTOP,, .F. )
 
-      cVol_Left := VOLUMENAME( SUBSTR( cStartLeft, 1, 2 ) + "\" ) + SPACE( 5 ) + Diskfree( cStartLeft )
+      cVol_Left  := VOLUMENAME( SUBSTR( cStartLeft, 1, 2 ) + "\" ) + SPACE( 5 ) + Diskfree( cStartLeft )
       cVol_Right := VOLUMENAME( SUBSTR( cStartRight, 1, 2 ) + "\" ) + SPACE( 5 ) + Diskfree( cStartRight )
 
-      @  4, 100                  SAY oVol_Left PROMPT cVol_Left FONT oFontDefault SIZE( nWidth / 2 ) - 176, 30 PIXEL OF oMain           
-      @  4, ( nWidth / 2 ) + 100 SAY oVol_Right PROMPT cVol_Right FONT oFontDefault SIZE( nWidth / 2 ) - 164, 30 PIXEL OF oMain         
+      @  4, 100                  SAY oVol_Left PROMPT cVol_Left FONT oFontDefault SIZE( nWidth / 2 ) - 176 - 20, 30 PIXEL OF oMain
+      @  4, ( nWidth / 2 ) + 100 SAY oVol_Right PROMPT cVol_Right FONT oFontDefault SIZE( nWidth / 2 ) - 164 - 20, 30 PIXEL OF oMain
 
       // ************************* left Side        **************************
 
-      oCombo_left := TComboBox() :new( 0, 0,, acItem, 90, 300, oMain,,,, BFcolor, BGcolor, .T., oFontDefault,,,, .F., acBitmaps )
+      oCombo_left  := TComboBox() :new( 0, 0,, acItem, 90, 300, oMain,,,, BFcolor, BGcolor, .T., oFontDefault,,,, .F., acBitmaps )
       oCombo_left:nDropWidth( 200 )
       oCombo_left:nItemHeight( 32 )
       oCombo_left:nSelectionHeight( 32 )
       oCombo_left:Select( DriveNumber( cStartLeft ) )
-      oCombo_left:bKeyDown := { | nKey | IF( nKey = 13, Change2Drive( oCombo_left:GetSelText(), 1 ), nil ) }
+      oCombo_left:bCloseUp := { || Change2Drive( oCombo_left:GetSelText(), 1 ) }
+      oCombo_left:lIncSearch := .T.
 
       __ChangeStyleWindow( oCombo_left:hWnd, WS_TABSTOP,, .F. )
 
-      oTab_Left := TFolder() :New( 40, 1, { "Grid_left1" },, oMain, 1, BFcolor, BGcolor, .T., .F., ( nWidth / 2 ) - 5, nHeight - 180,,, oFontDefault )
-      oTab_Left:bChange := { || nDimLeft := oTab_Left:nOption }
+      IF lUse_TFolderEx = .F.
+         oTab_Left := TFolder() :New( 40, 1, { "Grid_left1" },, oMain, 1, BFcolor, BGcolor, lPixel, lDesign, ( nWidth / 2 ) - 5, nHeight - 180,,, oFontDefault )
+         oTab_Left:bChange := { || nDimLeft := oTab_Left:nOption }
 
-#define Use_Explorer
-#ifdef Use_Explorer
-      oExpl_Left := TExplorer() :New( oTab_Left:aDialogs[ 1 ], 10, 0, ( nWidth / 2 ) - 20, nHeight - 220, cStartLeft, nIcoLarge, nIcoSmall )
-      oExpl_Left:oGrid:bGotFocus := { || nGridFocus := 1, UpDateInfo( oExpl_Left:oGrid ) }
+      ELSE
+         aPrompts := { "Grid_left1" }
+         nClrPane := BGcolor
 
-      oExpl_Left:oSayActive := oSayActive
-      oExpl_Left:oVol_Info := oVol_Left
-      oExpl_Left:oCombo_Info := oCombo_Left
+         oTab_Left := TFolderEx() :New( 40, 1, ( nWidth / 2 ) - 5, nHeight - 180, oMain, ;
+                                  aBitmaps, lPixel, lDesign, aPrompts, nFolderHeight, ;
+                                  aHelps, nRound, bAction, bClrTabs, bClrText, aAlign, ;
+                                  lAdjust, nSeparator, nOption, bPopUp, lStretch, ;
+                                  cLayOut, bBmpAction, nBright, lAnimate, nSpeed, oFontDefault, ;
+                                  lTransparent, aDialogs, lBorder, nClrPane, cVarName )
 
-      oExpl_Left:SetStyle( VAL( cVIEWLeft ) )
-      IF cImageLeft = "YES"
-         oExpl_Left:DoSwitchCheck()
+         oTab_Left:bClrText := { | o, n | IF( oTab_Left:aEnable[ n ], BFcolor, GetSysColor( COLOR_GRAYTEXT ) ) }
+
+         oTab_Left:aGradSel := { { 0.10, nRGB( 255, 215, 0 ), nRGB( 205, 173, 0 ) }, ;
+                                 { 0.90, BGcolor, BGcolor } }
+
+         oTab_Left:aGradUnSel := { { 0.20, nRGB( 192, 192, 192 ), BGcolor }, ;
+                                   { 0.80, BGcolor, BGcolor } }
+
+         oTab_Left:aGradOver := { { 0.10, nRGB( 255, 215, 0 ), nRGB( 205, 173, 0 ) }, ;
+                                  { 0.90, BGcolor, BGcolor } }
+
+         oTab_Left:aGradOverUnSel := { { 0.20, nRGB( 192, 192, 192 ), BGcolor }, ;
+                                       { 0.80, BGcolor, BGcolor } }
+
+         __ChangeStyleWindow( oTab_Left:hWnd, WS_TABSTOP,, .T. )
+         oTab_Left:nDlgCode := DLGC_WANTALLKEYS
+
+         oTab_Left:bRClicked := { || OpenTabMenu( 1 ) }
+
+         oTab_Left:bAction := { || nDimLeft := oTab_Left:nOption }
       ENDIF
 
-      oUpLeft:bAction := { || ( nGridFocus := 1, oExpl_Left:DoLastFolder( TRIM( oExpl_Left:oGrid:cPath ) ) ) }
-      oRootLeft:bAction := { || ( nGridFocus := 1, oExpl_Left:DoNextFolder( SUBSTR( oExpl_Left:oGrid:cPath, 1, 3 ) ) ) }
+      IF lUse_Explorer = .T.
+         oExpl_Left := TExplorer() :New( oTab_Left:aDialogs[ 1 ], 10, 0, ( nWidth / 2 ) - 20, nHeight - 220, cStartLeft, nIcoLarge, nIcoSmall, lCheckbox, lDispInfo, lUse_Thread )
+         oExpl_Left:oGrid:bGotFocus := { || nGridFocus := 1, UpDateInfo( oExpl_Left:oGrid, oTab_Left ) }
 
-#endif
+         // no_more      oExpl_Left:oSayActive := oSayActive
+         oExpl_Left:oVol_Info := oVol_Left
+         oExpl_Left:oCombo_Info := oCombo_Left
+
+         oExpl_Left:SetStyle( VAL( cVIEWLeft ) )
+         IF cImageLeft = "YES"
+            oExpl_Left:DoSwitchCheck()
+         ENDIF
+
+         IF lUse_BTNBMP = .T.
+         ELSE
+            oUpLeft:bAction := { || ( nGridFocus := 1, oExpl_Left:DoLastFolder( TRIM( oExpl_Left:oGrid:cPath ) ) ) }
+            oRootLeft:bAction := { || ( nGridFocus := 1, oExpl_Left:DoNextFolder( SUBSTR( oExpl_Left:oGrid:cPath, 1, 3 ) ) ) }
+         ENDIF
+         oCombo_left:bOwnerDraw := { | a, b, c, d | oExpl_Left:DoMyComBo( a, b, c, d, @acItem, @acType, @acBitmaps, oCombo_left ) }
+         oCombo_left:GetKeyChar( ASC( SUBSTR( cPath, 1, 1 ) ) )
+
+      ENDIF
 
       // ************************* right Side       **************************
 
@@ -542,48 +775,89 @@ PUBLIC nGridFocus  := 1                                               // 1=left,
       oCombo_Right:nItemHeight( 32 )
       oCombo_Right:nSelectionHeight( 32 )
       oCombo_Right:Select( DriveNumber( cStartRight ) )
-      oCombo_Right:bKeyDown := { | nKey | IF( nKey = 13, Change2Drive( oCombo_Right:GetSelText(), 2 ), nil ) }
+      oCombo_Right:bCloseUp := { || Change2Drive( oCombo_Right:GetSelText(), 2 ) }
+      oCombo_Right:lIncSearch := .T.
 
       __ChangeStyleWindow( oCombo_Right:hWnd, WS_TABSTOP,, .F. )
 
-      oTab_Right := TFolder() :New( 40, ( nWidth / 2 ) + 5, { "Grid_right1" },, oMain, 1, BFcolor, BGcolor, .T., .F., ( nWidth / 2 ) - 10, nHeight - 180,,, oFontDefault )
-      oTab_Right:bChange := { || nDimRight := oTab_Right:nOption }
+      IF lUse_TFolderEx = .F.
+         oTab_Right := TFolder() :New( 40, ( nWidth / 2 ) + 5, { "Grid_right1" },, oMain, 1, BFcolor, BGcolor, lPixel, lDesign, ( nWidth / 2 ) - 10, nHeight - 180,,, oFontDefault )
+         oTab_Right:bChange := { || nDimRight := oTab_Right:nOption }
+      ELSE
+         aPrompts := { "Grid_right1" }
+         oTab_Right := TFolderEx() :New( 40, ( nWidth / 2 ) + 5, ( nWidth / 2 ) - 10, nHeight - 180, oMain, ;
+                                   aBitmaps, lPixel, lDesign, aPrompts, nFolderHeight, ;
+                                   aHelps, nRound, bAction, bClrTabs, bClrText, aAlign, ;
+                                   lAdjust, nSeparator, nOption, bPopUp, lStretch, ;
+                                   cLayOut, bBmpAction, nBright, lAnimate, nSpeed, oFontDefault, ;
+                                   lTransparent, aDialogs, lBorder, nClrPane, cVarName )
 
-#ifdef Use_Explorer
-      oExpl_Right := TExplorer() :New( oTab_Right:aDialogs[ 1 ], 10, 0, ( nWidth / 2 ) - 20, nHeight - 220, cStartRight, nIcoLarge, nIcoSmall )
-      oExpl_Right:oGrid:bGotFocus := { || nGridFocus := 2, UpDateInfo( oExpl_Right:oGrid ) }
+         oTab_Right:bClrText := { | o, n | IF( oTab_Right:aEnable[ n ], BFcolor, GetSysColor( COLOR_GRAYTEXT ) ) }
 
-      oExpl_Right:oSayActive := oSayActive
-      oExpl_Right:oVol_Info := oVol_Right
-      oExpl_Right:oCombo_Info := oCombo_Right
+         oTab_Right:aGradSel := { { 0.10, nRGB( 255, 215, 0 ), nRGB( 205, 173, 0 ) }, ;
+                                  { 0.90, BGcolor, BGcolor } }
 
-      oExpl_Right:SetStyle( VAL( cVIEWRight ) )
-      IF cImageRight = "YES"
-         oExpl_Right:DoSwitchCheck()
+         oTab_Right:aGradUnSel := { { 0.20, nRGB( 192, 192, 192 ), BGcolor }, ;
+                                    { 0.80, BGcolor, BGcolor } }
+
+         oTab_Right:aGradOver := { { 0.10, nRGB( 255, 215, 0 ), nRGB( 205, 173, 0 ) }, ;
+                                   { 0.90, BGcolor, BGcolor } }
+
+         oTab_Right:aGradOverUnSel := { { 0.20, nRGB( 192, 192, 192 ), BGcolor }, ;
+                                        { 0.80, BGcolor, BGcolor } }
+
+         __ChangeStyleWindow( oTab_Right:hWnd, WS_TABSTOP,, .T. )
+         oTab_Right:nDlgCode := DLGC_WANTALLKEYS
+
+         oTab_Right:bRClicked := { || OpenTabMenu( 2 ) }
+
+         oTab_Right:bAction := { || nDimRight := oTab_Right:nOption }
       ENDIF
 
-      oUpRight:bAction := { || ( nGridFocus := 2, oExpl_Right:DoLastFolder( TRIM( oExpl_Right:oGrid:cPath ) ) ) }
-      oRootRight:bAction := { || ( nGridFocus := 2, oExpl_Right:DoNextFolder( SUBSTR( oExpl_Right:oGrid:cPath, 1, 3 ) ) ) }
-#endif
+      IF lUse_Explorer = .T.
+         oExpl_Right := TExplorer() :New( oTab_Right:aDialogs[ 1 ], 10, 0, ( nWidth / 2 ) - 20, nHeight - 220, cStartRight, nIcoLarge, nIcoSmall, lCheckbox, lDispInfo, lUse_Thread )
+         oExpl_Right:oGrid:bGotFocus := { || nGridFocus := 2, UpDateInfo( oExpl_Right:oGrid, oTab_Right ) }
 
-#define Use_Splitter
-#ifdef Use_Splitter
-      @  0, ( nWidth / 2 ) - 10 SPLITTER oSplit ;
-              VERTICAL ;
-              PREVIOUS CONTROLS oTab_Left ;
-              HINDS CONTROLS oTab_Right ;
-              LEFT MARGIN 200 ;
-              RIGHT MARGIN 200 ;
-              SIZE 8, nHeight - 68 PIXEL ;
-              3DLOOK ;
-              ON CHANGE DoResize( nSizeType, oSplit, aButton, oRootLeft, oRootRight, oUpLeft, oUpRight ) ;
-              OF oMain
-#endif
+         // no_more      oExpl_Right:oSayActive := oSayActive
+         oExpl_Right:oVol_Info := oVol_Right
+         oExpl_Right:oCombo_Info := oCombo_Right
+
+         oExpl_Right:SetStyle( VAL( cVIEWRight ) )
+         IF cImageRight = "YES"
+            oExpl_Right:DoSwitchCheck()
+         ENDIF
+
+         IF lUse_BTNBMP = .T.
+         ELSE
+            oUpRight:bAction := { || ( nGridFocus := 2, oExpl_Right:DoLastFolder( TRIM( oExpl_Right:oGrid:cPath ) ) ) }
+            oRootRight:bAction := { || ( nGridFocus := 2, oExpl_Right:DoNextFolder( SUBSTR( oExpl_Right:oGrid:cPath, 1, 3 ) ) ) }
+         ENDIF
+
+         oCombo_Right:bOwnerDraw := { | a, b, c, d | oExpl_Right:DoMyComBo( a, b, c, d, @acItem, @acType, @acBitmaps, oCombo_Right ) }
+         oCombo_Right:GetKeyChar( ASC( SUBSTR( cPath, 1, 1 ) ) )
+
+      ENDIF
+
+      IF lUse_Splitter = .T.
+         @ 340, ( nWidth / 2 ) - 8 SPLITTER oSplit ;
+                  VERTICAL ;
+                  PREVIOUS CONTROLS oTab_Left ;
+                  HINDS CONTROLS oTab_Right ;
+                  LEFT MARGIN 200 ;
+                  RIGHT MARGIN 200 ;
+                  SIZE 6, nHeight - 68 - 340 PIXEL ;
+                  3DLOOK ;
+                  COLOR nRGB( 56, 56, 56 ) ;
+                  ON CHANGE DoResize( nSizeType, oSplit, aButton, oRootLeft, oRootRight, oUpLeft, oUpRight ) ;
+                  OF oMain
+      ENDIF
 
       MakeFNbutton( aButton )
 
+      aButton[ 1 ] :bAction := { || oExpl_Left:oGrid:HelpTopic() }
+
       aButton[ 2 ] :bAction := { || FuncSysFolder() }
-      aButton[ 3 ] :bAction := { || Viewer() }
+      aButton[ 4 ] :bAction := { || Viewer() }
 
       aButton[ 5 ] :bAction := { || IF( nGridFocus = 1, oExpl_Left:ASKFORM( "COPY" ), oExpl_Right:ASKFORM( "COPY" ) ) }
       aButton[ 6 ] :bAction := { || IF( nGridFocus = 1, oExpl_Left:ASKFORM( "MOVE" ), oExpl_Right:ASKFORM( "MOVE" ) ) }
@@ -593,10 +867,10 @@ PUBLIC nGridFocus  := 1                                               // 1=left,
 
       aButton[ 11 ] :bAction := { || FuncMSCFolder() }
 
-      DEFINE MESSAGE oStatusBar PROMPT "" OF oMain FONT oFontSmall KEYBOARD DATE CLOCK
+      oStatusBar := TMsgBar() :New( oMain, "",, .T., .T., .T., BFCOLOR, BGCOLOR, oFontSmall, .F., .F., .F., .F., .F. )
+      oStatusBar:cMsgDef := ""
 
 #IFDEF __HMG__
-      END MESSAGE
    END WINDOW
 #ENDIF
 
@@ -605,15 +879,12 @@ PUBLIC nGridFocus  := 1                                               // 1=left,
 
    oMain:bOnDeviceChange := { | o, w, l | OnDeviceChange( o, w, l ), oMain:Refresh() }
 
+   oMain:bGotFocus := { || IF( nGridFocus = 1, ;
+                        oExpl_Left:oGrid:setfocus(), ;
+                        oExpl_Right:oGrid:setfocus() ) }
+
    oTab_Left:SetOption( 1 )
    oTab_Right:SetOption( 1 )
-
-   //   SETHELPFILE("HELP.TXT")
-   //   SETKEY( VK_F1, { || ShowHelp() } )
-   //   SetHelpFile( "FiveWin.hlp" )
-   //   SetHelpFile( "HELP.TXT" )
-   SetHelpFile( NIL )
-   SETKEY( VK_F1, { || GodMode() } )
 
    ACTIVATE WINDOW oMain ON INIT DoSplash( nWidth, nHeight ) ;
            ON RESIZE DoResize( nSizeType, oSplit, aButton, oRootLeft, oRootRight, oUpLeft, oUpRight ) ;
@@ -621,17 +892,16 @@ PUBLIC nGridFocus  := 1                                               // 1=left,
 
    //------------------------------ save INI   -------------------------------
 
-   cRow := VAR2CHAR( aRect[ 1 ] )
-   cCol := VAR2CHAR( aRect[ 2 ] )
-   cHeight := VAR2CHAR( aRect[ 3 ] - aRect[ 1 ] )
-   cWidth := VAR2CHAR( aRect[ 4 ] - aRect[ 2 ] )
    cFontSize := VAR2CHAR( oFontDefault:nHeight )
-   cFontBig := VAR2CHAR( nFontBig )
+   cFontBig  := VAR2CHAR( nFontBig )
+   cRow      := VAR2CHAR( aRect[ 1 ] )
+   cCol      := VAR2CHAR( aRect[ 2 ] )
+   cHeight   := VAR2CHAR( aRect[ 3 ] - aRect[ 1 ] )
+   cWidth    := VAR2CHAR( aRect[ 4 ] - aRect[ 2 ] )
+   cBGcolor  := BGcolor
+   cBFcolor  := BFcolor
 
-   cBGcolor := BGcolor
-   cBFcolor := BFcolor
-
-   nDimLeft := 1
+   nDimLeft  := 1
    nDimRight := 1
    cStartLeft := EndwithSlash( oExpl_Left :oGrid:cPath )
    cStartRight := EndwithSlash( oExpl_Right:oGrid:cPath )
@@ -647,22 +917,49 @@ PUBLIC nGridFocus  := 1                                               // 1=left,
       cImageRight = "NO"
    ENDIF
 
-   cVIEWLeft := LTRIM( STR( oExpl_Left:oGrid:nview ) )
+   IF lUse_Splitter
+      cSplitter := "YES"
+   ELSE
+      cSplitter := "NO"
+   ENDIF
+
+   IF lUse_TFolderEx
+      cTFolder  := "YES"
+   ELSE
+      cTFolder  := "NO"
+   ENDIF
+
+   IF lUse_BTNBMP
+      cBTNBMP   := "YES"
+   ELSE
+      cBTNBMP   := "NO"
+   ENDIF
+
+   IF lUse_IconEx
+      cIconEx   := "YES"
+   ELSE
+      cIconEx   := "NO"
+   ENDIF
+
+   cVIEWLeft  := LTRIM( STR( oExpl_Left:oGrid:nview ) )
    cVIEWRight := LTRIM( STR( oExpl_Right:oGrid:nview ) )
 
    FERASE( cPath + "Config.ini" )
-   LoadConfig( cRow, cCol, cWidth, cHeight, cFontSize, cFontBig, cTranslateCP, cTransparent, cLangCode, cCodepage, cStartLeft, cStartRight, cImageLeft, cImageRight, cVIEWLeft, cVIEWRight, cIcoLarge, cIcoSmall, cBGcolor, cBFcolor )
+   LoadConfig( cRow, cCol, cWidth, cHeight, cFontSize, cFontBig, cTranslateCP,;
+               cTransparent, cLangCode, cCodepage, cStartLeft, cStartRight,;
+               cImageLeft, cImageRight, cVIEWLeft, cVIEWRight, cIcoLarge,;
+               cIcoSmall, cBGcolor, cBFcolor, cSplitter,cTFolder,cBTNBMP,cIconEx )
 
    //-------------------------------------------------------------------------
 
-#IFDEF Use_Debug
-   SET ALTER TO
-   SET ALTER OFF
-   //  WinExec( "notepad" + " " + "_LOGIT2.TXT " )
-#ENDIF
+   IF lUse_Debug
+      SET ALTER TO
+      SET ALTER OFF
+      //  WinExec( "notepad" + " " + "_LOGIT2.TXT " )
+   ENDIF
 
    IF !EMPTY( oFontBig )
-      // oFont:End()
+      // oFontBig:End()
    ENDIF
    IF !EMPTY( oFontDefault )
       // oFontDefault:End()
@@ -675,7 +972,7 @@ PUBLIC nGridFocus  := 1                                               // 1=left,
       oMain:End()
    ENDIF
 
-   // FWLOG "Ende"
+   FWLOG "Ende"
    // WinExec( "notepad.exe " + cLog )
 
 RETURN
@@ -688,7 +985,10 @@ RETURN
 *+
 *+--------------------------------------------------------------------
 *+
-STATIC PROCEDURE LoadConfig( cRow, cCol, cWidth, cHeight, cFontSize, cFontBig, cTranslateCP, cTransparent, cLangCode, cCodepage, cStartLeft, cStartRight, cImageLeft, cImageRight, cVIEWLeft, cVIEWRight, cIcoLarge, cIcoSmall, cBGcolor, cBFcolor )
+STATIC PROCEDURE LoadConfig( cRow, cCol, cWidth, cHeight, cFontSize, cFontBig,;
+  cTranslateCP, cTransparent, cLangCode, cCodepage, cStartLeft, cStartRight,;
+  cImageLeft, cImageRight, cVIEWLeft, cVIEWRight, cIcoLarge, cIcoSmall, ;
+  cBGcolor, cBFcolor , cSplitter,cTFolder,cBTNBMP,cIconEx )
 
 LOCAL oINI
 LOCAL cPath := hb_Dirbase()
@@ -696,61 +996,71 @@ LOCAL cPath := hb_Dirbase()
    IF !FILE( cPath + "Config.ini" )
       INI oINI FILE cPath + "Config.ini"
 
-      Set Section "MAINWINDOW" ENTRY "Row" TO cRow OF oINI
-      Set Section "MAINWINDOW" ENTRY "Col" TO cCol OF oINI
-      Set Section "MAINWINDOW" ENTRY "Width" TO cWidth OF oINI
-      Set Section "MAINWINDOW" ENTRY "Height" TO cHeight OF oINI
+      Set Section "MAINWINDOW" ENTRY "Row"      TO cRow OF oINI
+      Set Section "MAINWINDOW" ENTRY "Col"      TO cCol OF oINI
+      Set Section "MAINWINDOW" ENTRY "Width"    TO cWidth OF oINI
+      Set Section "MAINWINDOW" ENTRY "Height"   TO cHeight OF oINI
       Set Section "MAINWINDOW" ENTRY "FontSize" TO cFontSize OF oINI
-      Set Section "MAINWINDOW" ENTRY "FontBig" TO cFontBig OF oINI
-
-      Set Section "TRANSLATEWINDOW" ENTRY "TranslateCP" TO cTranslateCP OF oINI
+      Set Section "MAINWINDOW" ENTRY "FontBig"  TO cFontBig OF oINI
 
       Set Section "COUNTRY" ENTRY "LangCode" TO cLangCode OF oINI
       Set Section "COUNTRY" ENTRY "Codepage" TO cCodepage OF oINI
 
-      Set Section "TRANSPARENCY" ENTRY "Transparency" TO cTransparent OF oINI
-
-      Set Section "STARTPATH" ENTRY "StartLeft" TO cStartLeft OF oINI
-      Set Section "STARTPATH" ENTRY "StartRight" TO cStartRight OF oINI
-      Set Section "STARTPATH" ENTRY "ImageLeft" TO cImageLeft OF oINI
-      Set Section "STARTPATH" ENTRY "ImageRight" TO cImageRight OF oINI
-      Set Section "STARTPATH" ENTRY "VIEWLeft" TO cVIEWLeft OF oINI
-      Set Section "STARTPATH" ENTRY "VIEWRight" TO cVIEWRight OF oINI
-      Set Section "STARTPATH" ENTRY "IcoLarge" TO cIcoLarge OF oINI
-      Set Section "STARTPATH" ENTRY "IcoSmall" TO cIcoSmall OF oINI
-
       Set Section "COLORS" ENTRY "BackgroundColor" TO cBGcolor OF oINI
       Set Section "COLORS" ENTRY "ForegroundColor" TO cBFcolor OF oINI
+
+      Set Section "STARTPATH" ENTRY "StartLeft"  TO cStartLeft OF oINI
+      Set Section "STARTPATH" ENTRY "StartRight" TO cStartRight OF oINI
+      Set Section "STARTPATH" ENTRY "ImageLeft"  TO cImageLeft OF oINI
+      Set Section "STARTPATH" ENTRY "ImageRight" TO cImageRight OF oINI
+      Set Section "STARTPATH" ENTRY "VIEWLeft"   TO cVIEWLeft OF oINI
+      Set Section "STARTPATH" ENTRY "VIEWRight"  TO cVIEWRight OF oINI
+      Set Section "STARTPATH" ENTRY "IcoLarge"   TO cIcoLarge OF oINI
+      Set Section "STARTPATH" ENTRY "IcoSmall"   TO cIcoSmall OF oINI
+
+      Set Section "TRANSLATEWINDOW" ENTRY "TranslateCP" TO cTranslateCP OF oINI
+
+      Set Section "TRANSPARENCY" ENTRY "Transparency" TO cTransparent OF oINI
+
+      Set Section "CONTROLS"  ENTRY "Splitter"   TO cSplitter  OF oINI
+      Set Section "CONTROLS"  ENTRY "TFolder"    TO cTFolder   OF oINI
+      Set Section "CONTROLS"  ENTRY "BTNBMP"     TO cBTNBMP    OF oINI
+      Set Section "CONTROLS"  ENTRY "IconEx"     TO cIconEx    OF oINI
 
       ENDINI
    ELSE
       INI oINI FILE cPath + "Config.ini"
 
-      GET cRow Section "MAINWINDOW" ENTRY "Row" OF oINI
-      GET cCol Section "MAINWINDOW" ENTRY "Col" OF oINI
-      GET cWidth Section "MAINWINDOW" ENTRY "Width" OF oINI
-      GET cHeight Section "MAINWINDOW" ENTRY "Height" OF oINI
+      GET cRow      Section "MAINWINDOW" ENTRY "Row"      OF oINI
+      GET cCol      Section "MAINWINDOW" ENTRY "Col"      OF oINI
+      GET cWidth    Section "MAINWINDOW" ENTRY "Width"    OF oINI
+      GET cHeight   Section "MAINWINDOW" ENTRY "Height"   OF oINI
       GET cFontSize Section "MAINWINDOW" ENTRY "FontSize" OF oINI
-      GET cFontBig Section "MAINWINDOW" ENTRY "FontBig" OF oINI
+      GET cFontBig  Section "MAINWINDOW" ENTRY "FontBig"  OF oINI
 
-      GET cTranslateCP Section "TRANSLATEWINDOW" ENTRY "TranslateCP" OF oINI
+      GET cLangCode Section "COUNTRY"    ENTRY "LangCode" OF oINI
+      GET cCodepage Section "COUNTRY"    ENTRY "Codepage" OF oINI
 
-      GET cLangCode Section "COUNTRY" ENTRY "LangCode" OF oINI
-      GET cCodepage Section "COUNTRY" ENTRY "Codepage" OF oINI
+      GET cBGcolor  Section "COLORS" ENTRY "BackgroundColor" OF oINI
+      GET cBFcolor  Section "COLORS" ENTRY "ForegroundColor" OF oINI
+
+      GET cStartLeft  Section "STARTPATH" ENTRY "StartLeft"  OF oINI
+      GET cStartRight Section "STARTPATH" ENTRY "StartRight" OF oINI
+      GET cImageLeft  Section "STARTPATH" ENTRY "ImageLeft"  OF oINI
+      GET cImageRight Section "STARTPATH" ENTRY "ImageRight" OF oINI
+      GET cVIEWLeft   Section "STARTPATH" ENTRY "VIEWLeft"   OF oINI
+      GET cVIEWRight  Section "STARTPATH" ENTRY "VIEWRight"  OF oINI
+      GET cIcoLarge   Section "STARTPATH" ENTRY "IcoLarge"   OF oINI
+      GET cIcoSmall   Section "STARTPATH" ENTRY "IcoSmall"   OF oINI
 
       GET cTransparent Section "TRANSPARENCY" ENTRY "Transparency" OF oINI
 
-      GET cStartLeft Section "STARTPATH" ENTRY "StartLeft" OF oINI
-      GET cStartRight Section "STARTPATH" ENTRY "StartRight" OF oINI
-      GET cImageLeft Section "STARTPATH" ENTRY "ImageLeft" OF oINI
-      GET cImageRight Section "STARTPATH" ENTRY "ImageRight" OF oINI
-      GET cVIEWLeft Section "STARTPATH" ENTRY "VIEWLeft" OF oINI
-      GET cVIEWRight Section "STARTPATH" ENTRY "VIEWRight" OF oINI
-      GET cIcoLarge Section "STARTPATH" ENTRY "IcoLarge" OF oINI
-      GET cIcoSmall Section "STARTPATH" ENTRY "IcoSmall" OF oINI
+      GET cTranslateCP Section "TRANSLATEWINDOW" ENTRY "TranslateCP" OF oINI
 
-      GET cBGcolor Section "COLORS" ENTRY "BackgroundColor" OF oINI
-      GET cBFcolor Section "COLORS" ENTRY "ForegroundColor" OF oINI
+      GET cSplitter Section "CONTROLS"  ENTRY "Splitter"  OF oINI
+      GET cTFolder  Section "CONTROLS"  ENTRY "TFolder"   OF oINI
+      GET cBTNBMP   Section "CONTROLS"  ENTRY "BTNBMP"    OF oINI
+      GET cIconEx   Section "CONTROLS"  ENTRY "IconEx"    OF oINI
 
       ENDINI
    ENDIF
@@ -768,13 +1078,49 @@ RETURN
 STATIC PROCEDURE DoMyKey( nKey, nFlag, cWho, oSelf )
 
    DO CASE
+      CASE GetKeyState( VK_CONTROL ) .AND. ( nKey == VK_F3 )
+         IF nGridFocus = 1
+            oExpl_Left:oGrid:SetGridHeaderSort( LV_NAME )
+         ELSE
+            oExpl_Right:oGrid:SetGridHeaderSort( LV_NAME )
+         ENDIF
+      CASE GetKeyState( VK_CONTROL ) .AND. ( nKey == VK_F4 )
+         IF nGridFocus = 1
+            oExpl_Left:oGrid:SetGridHeaderSort( LV_EXT )
+         ELSE
+            oExpl_Right:oGrid:SetGridHeaderSort( LV_EXT )
+         ENDIF
+      CASE GetKeyState( VK_CONTROL ) .AND. ( nKey == VK_F5 )
+         IF nGridFocus = 1
+            oExpl_Left:oGrid:SetGridHeaderSort( LV_SIZE )
+         ELSE
+            oExpl_Right:oGrid:SetGridHeaderSort( LV_SIZE )
+         ENDIF
+      CASE GetKeyState( VK_CONTROL ) .AND. ( nKey == VK_F6 )
+         IF nGridFocus = 1
+            oExpl_Left:oGrid:SetGridHeaderSort( LV_DATE )
+         ELSE
+            oExpl_Right:oGrid:SetGridHeaderSort( LV_DATE )
+         ENDIF
+      CASE GetKeyState( VK_CONTROL ) .AND. ( nKey == VK_F7 )
+         IF nGridFocus = 1
+            oExpl_Left:oGrid:SetGridHeaderSort( - 1 )
+         ELSE
+            oExpl_Right:oGrid:SetGridHeaderSort( - 1 )
+         ENDIF
+
       CASE GetKeyState( VK_CONTROL ) .AND. ( nKey == ASC( "t" ) .OR. nKey == ASC( "T" ) )
          NewTab()
+
+      CASE nKey = VK_F1
+         oExpl_Left:oGrid:HelpTopic()
 
       CASE nKey = VK_F2
          FuncSysFolder()
 
       CASE nKey = VK_F3
+
+      CASE nKey = VK_F4
          Viewer()
 
       CASE nKey = VK_F5
@@ -791,6 +1137,9 @@ STATIC PROCEDURE DoMyKey( nKey, nFlag, cWho, oSelf )
 
       CASE nKey = VK_F9
          ShowHistory()
+
+      CASE nKey = VK_F10                                              // does not work ? open MENU
+         OpenConTextMenu()
 
       CASE nKey = VK_F11
          FuncMSCFolder()
@@ -828,6 +1177,10 @@ LOCAL oMenu, oItem1
               COLORPNEL BFcolor, BGcolor ;
               COLORLEFT BFcolor, BGcolor ;
               COLORSELECT BFcolor, BGcolor, BFcolor
+
+   ELSEIF BGColor = 256 * 256 * 256 - 1                               // 16777215
+      MENU oMenu 2013 ;
+              COLORSELECT GetSysColor( COLOR_MENUHILIGHT ), GetSysColor( COLOR_MENUHILIGHT ), GetSysColor( COLOR_MENU )
    ELSE
       MENU oMenu 2013 ;
               COLORMENU BGcolor, BFcolor ;
@@ -849,9 +1202,9 @@ LOCAL oMenu, oItem1
                                  ACTION OpenComboSide( "right" )
 
    SEPARATOR
-   MENUITEM "Everything" + CHR( 9 ) + "ALT+F7" RESNAME "MYEVERY" ;
-                                ACCELERATOR ACC_ALT, 65654 ;
-                                ACTION SearchWithEverything()
+   MENUITEM "E&verything" + CHR( 9 ) + "ALT+F7" RESNAME "MYEVERY" ;
+                                 ACCELERATOR ACC_ALT, 65654 ;
+                                 ACTION SearchWithEverything()
 
    SEPARATOR
    MENUITEM "E&xit" + CHR( 9 ) + "ALT+F4" RESNAME "MYEXIT" ACTION oMain:End()
@@ -859,15 +1212,15 @@ LOCAL oMenu, oItem1
 
    MENUITEM "Color"
    MENU
-   MENUITEM "Background" RESNAME "MYCOLORBG" ACTION( BGcolor := Colordialog( NumColor2RGB( BGcolor ), .T. ) )
-   MENUITEM "Foreground" RESNAME "MYCOLORFG" ACTION( BFcolor := Colordialog( NumColor2RGB( BFcolor ), .T. ) )
+   MENUITEM "&Background" RESNAME "MYCOLORBG" ACTION( BGcolor := Colordialog( Num2RGB( BGcolor ), .T. ) )
+   MENUITEM "&Foreground" RESNAME "MYCOLORFG" ACTION( BFcolor := Colordialog( Num2RGB( BFcolor ), .T. ) )
    ENDMENU
 
    MENUITEM "Device"
    MENU
-   MENUITEM "iPhone" RESNAME "MYPHONE" ACTION CalliPhone()
+   MENUITEM "&iPhone" RESNAME "MYPHONE" ACTION CalliPhone()
    SEPARATOR
-   MENUITEM "eject Device" RESNAME "MYEJECTUSB" ACTION USBeject()
+   MENUITEM "&eject Device" RESNAME "MYEJECTUSB" ACTION USBeject()
    ENDMENU
 
    MENUITEM "Network"
@@ -913,6 +1266,43 @@ RETURN
 
 *+--------------------------------------------------------------------
 *+
+*+    Static Procedure OpenConTextMenu()
+*+
+*+    Called from ( dualgrid.prg )   1 - static procedure domykey()
+*+                                   1 - static procedure makefnbutton()
+*+
+*+--------------------------------------------------------------------
+*+
+STATIC PROCEDURE OpenConTextMenu()
+
+   IF nGridFocus = 1
+      oExpl_Left:BUILDMENU( oExpl_Left:oGrid, 0, 0 )
+   ELSE
+      oExpl_Right:BUILDMENU( oExpl_Right:oGrid, 0, 0 )
+   ENDIF
+RETURN
+
+*+--------------------------------------------------------------------
+*+
+*+    Static Procedure OpenTabMenu()
+*+
+*+    Called from ( dualgrid.prg )   2 - procedure main()
+*+
+*+--------------------------------------------------------------------
+*+
+STATIC PROCEDURE OpenTabMenu( nSide )
+
+   IF nSide = 1
+      nGridFocus := 1
+      oExpl_Left:TABmenu( oExpl_Left:oGrid, 0, 0 )
+   ELSE
+      nGridFocus := 2
+      oExpl_Right:TABmenu( oExpl_Right:oGrid, 0, 0 )
+   ENDIF
+RETURN
+
+*+--------------------------------------------------------------------
+*+
 *+    Static Procedure MakeFNbutton()
 *+
 *+    Called from ( dualgrid.prg )   1 - procedure main()
@@ -926,68 +1316,162 @@ LOCAL nWidth     := 1280
 LOCAL nPart      := nWidth / nUseButton
 LOCAL nCol       := 0
 LOCAL lMultiline := .T.
-LOCAL bAction
-LOCAL oBtn, ii
+LOCAL bAction, aBitmaps
+LOCAL oBtn, ii, hDC
 
    bAction := { || MsgInfo( 'under Construction ... ' ) }
 
-   oBtn := TButton() :new( nHeight - 132, nCol, "F1", oMain,, nPart - 4, 50,, oFontDefault,, .T. )
-   oBtn:bAction := bAction
-   AADD( aButton, oBtn )
-   nCol += nPart
+   IF lUse_BTNBMP = .T.
 
-   oBtn := TButton() :new( nHeight - 132, nCol, "F2" + CRLF + "CSIDL", oMain,, nPart - 4, 50,, oFontDefault,, .T.,,,,,,,, lMultiline, )
-   AADD( aButton, oBtn )
-   nCol += nPart
+      @ nHeight - 132, nCol BTNBMP oBtn SIZE nPart - 4, 44 PIXEL OF oMain ;
+              PROMPT "F1" CENTER ;
+              ACTION( oExpl_Left:oGrid:HelpTopic() ) FONT oFontDefault COLOR BFcolor, BGcolor
+      oBtn:bClrGrad := bGradient
+      AADD( aButton, oBtn )
+      nCol += nPart
 
-   oBtn := TButton() :new( nHeight - 132, nCol, "F3" + CRLF + "Viewer", oMain,, nPart - 4, 50,, oFontDefault,, .T.,,,,,,,, lMultiline, )
-   AADD( aButton, oBtn )
-   nCol += nPart
+      @ nHeight - 132, nCol BTNBMP oBtn SIZE nPart - 4, 44 PIXEL OF oMain ;
+              PROMPT "F2 " + CRLF + "CSIDL" CENTER ;
+              ACTION( FuncSysFolder() ) FONT oFontDefault COLOR BFcolor, BGcolor
+      oBtn:bClrGrad := bGradient
+      AADD( aButton, oBtn )
+      nCol += nPart
 
-   oBtn := TButton() :new( nHeight - 132, nCol, "F4", oMain,, nPart - 4, 50,, oFontDefault,, .T. )
-   oBtn:bAction := bAction
-   AADD( aButton, oBtn )
-   nCol += nPart
+      @ nHeight - 132, nCol BTNBMP oBtn SIZE nPart - 4, 44 PIXEL OF oMain ;
+              PROMPT "F3" CENTER ;
+              ACTION( nil ) FONT oFontDefault COLOR BFcolor, BGcolor
+      oBtn:bClrGrad := bGradient
+      AADD( aButton, oBtn )
+      nCol += nPart
 
-   oBtn := TButton() :new( nHeight - 132, nCol, "F5" + CRLF + "copy", oMain,, nPart - 4, 50,, oFontDefault,, .T.,,,,,,,, lMultiline, )
-   AADD( aButton, oBtn )
-   nCol += nPart
+      @ nHeight - 132, nCol BTNBMP oBtn SIZE nPart - 4, 44 PIXEL OF oMain ;
+              PROMPT "F4 " + CRLF + "DBF" CENTER ;
+              ACTION( Viewer() ) FONT oFontDefault COLOR BFcolor, BGcolor
+      oBtn:bClrGrad := bGradient
+      AADD( aButton, oBtn )
+      nCol += nPart
 
-   oBtn := TButton() :new( nHeight - 132, nCol, "F6" + CRLF + "Move", oMain,, nPart - 4, 50,, oFontDefault,, .T.,,,,,,,, lMultiline, )
-   AADD( aButton, oBtn )
-   nCol += nPart
+      @ nHeight - 132, nCol BTNBMP oBtn SIZE nPart - 4, 44 PIXEL OF oMain ;
+              PROMPT "F5 " + CRLF + "copy" CENTER ;
+              ACTION( IF( nGridFocus = 1, oExpl_Left:ASKFORM( "COPY" ), oExpl_Right:ASKFORM( "COPY" ) ) ) FONT oFontDefault COLOR BFcolor, BGcolor
+      oBtn:bClrGrad := bGradient
+      AADD( aButton, oBtn )
+      nCol += nPart
 
-   oBtn := TButton() :new( nHeight - 132, nCol, "F7" + CRLF + "Folder", oMain,, nPart - 4, 50,, oFontDefault,, .T.,,,,,,,, lMultiline, )
-   AADD( aButton, oBtn )
-   nCol += nPart
+      @ nHeight - 132, nCol BTNBMP oBtn SIZE nPart - 4, 44 PIXEL OF oMain ;
+              PROMPT "F6 " + CRLF + "move" CENTER ;
+              ACTION( IF( nGridFocus = 1, oExpl_Left:ASKFORM( "MOVE" ), oExpl_Right:ASKFORM( "MOVE" ) ) ) FONT oFontDefault COLOR BFcolor, BGcolor
+      oBtn:bClrGrad := bGradient
+      AADD( aButton, oBtn )
+      nCol += nPart
 
-   oBtn := TButton() :new( nHeight - 132, nCol, "F8" + CRLF + "delete", oMain,, nPart - 4, 50,, oFontDefault,, .T.,,,,,,,, lMultiline, )
-   AADD( aButton, oBtn )
-   nCol += nPart
+      @ nHeight - 132, nCol BTNBMP oBtn SIZE nPart - 4, 44 PIXEL OF oMain ;
+              PROMPT "F7 " + CRLF + "Folder" CENTER ;
+              ACTION( MakeNewFolder() ) FONT oFontDefault COLOR BFcolor, BGcolor
+      oBtn:bClrGrad := bGradient
+      AADD( aButton, oBtn )
+      nCol += nPart
 
-   oBtn := TButton() :new( nHeight - 132, nCol, "F9" + CRLF + "History", oMain,, nPart - 4, 50,, oFontDefault,, .T.,,,,,,,, lMultiline, )
-   AADD( aButton, oBtn )
-   nCol += nPart
+      @ nHeight - 132, nCol BTNBMP oBtn SIZE nPart - 4, 44 PIXEL OF oMain ;
+              PROMPT "F8 " + CRLF + "delete" CENTER ;
+              ACTION( IF( nGridFocus = 1, oExpl_Left:ASKFORM( "DELETE" ), oExpl_Right:ASKFORM( "DELETE" ) ) ) FONT oFontDefault COLOR BFcolor, BGcolor
+      oBtn:bClrGrad := bGradient
+      AADD( aButton, oBtn )
+      nCol += nPart
 
-   oBtn := TButton() :new( nHeight - 132, nCol, "F10", oMain,, nPart - 4, 50,, oFontDefault,, .T. )
-   oBtn:bAction := bAction
-   AADD( aButton, oBtn )
-   nCol += nPart
+      @ nHeight - 132, nCol BTNBMP oBtn SIZE nPart - 4, 44 PIXEL OF oMain ;
+              PROMPT "F9 " + CRLF + "History" CENTER ;
+              ACTION( ShowHistory() ) FONT oFontDefault COLOR BFcolor, BGcolor
+      oBtn:bClrGrad := bGradient
+      AADD( aButton, oBtn )
+      nCol += nPart
 
-   oBtn := TButton() :new( nHeight - 132, nCol, "F11" + CRLF + "MSC Func", oMain,, nPart - 4, 50,, oFontDefault,, .T.,,,,,,,, lMultiline, )
-   AADD( aButton, oBtn )
-   nCol += nPart
+      @ nHeight - 132, nCol BTNBMP oBtn SIZE nPart - 4, 44 PIXEL OF oMain ;
+              PROMPT "F10" CENTER ;
+              ACTION( OpenConTextMenu() ) FONT oFontDefault COLOR BFcolor, BGcolor
+      oBtn:bClrGrad := bGradient
+      AADD( aButton, oBtn )
+      nCol += nPart
 
-   IF nUseButton = 12
-      oBtn := TButton() :new( nHeight - 132, nCol, "F12", oMain,, nPart - 4, 50,, oFontDefault,, .T. )
+      @ nHeight - 132, nCol BTNBMP oBtn SIZE nPart - 4, 44 PIXEL OF oMain ;
+              PROMPT "F11 " + CRLF + "MSC Func" CENTER ;
+              ACTION( FuncMSCFolder() ) FONT oFontDefault COLOR BFcolor, BGcolor
+      oBtn:bClrGrad := bGradient
+      AADD( aButton, oBtn )
+      nCol += nPart
+
+      IF nUseButton = 12
+         @ nHeight - 132, nCol BTNBMP oBtn SIZE nPart - 4, 44 PIXEL OF oMain ;
+                 PROMPT "F12" CENTER ;
+                 ACTION( nil ) FONT oFontDefault COLOR BFcolor, BGcolor
+         oBtn:bClrGrad := bGradient
+         AADD( aButton, oBtn )
+         nCol += nPart
+      ENDIF
+
+      FOR ii := 1 TO LEN( aButton )
+         __ChangeStyleWindow( aButton[ ii ] :hWnd, WS_TABSTOP,, .F. )
+      NEXT
+
+   ELSE
+
+      oBtn := TButton() :new( nHeight - 132, nCol, "F1", oMain,, nPart - 4, 50,, oFontDefault,, .T. )
+      AADD( aButton, oBtn )
+      nCol += nPart
+
+      oBtn := TButton() :new( nHeight - 132, nCol, "F2" + CRLF + "CSIDL", oMain,, nPart - 4, 50,, oFontDefault,, .T.,,,,,,,, lMultiline, )
+      AADD( aButton, oBtn )
+      nCol += nPart
+
+      oBtn := TButton() :new( nHeight - 132, nCol, "F3", oMain,, nPart - 4, 50,, oFontDefault,, .T. )
       oBtn:bAction := bAction
       AADD( aButton, oBtn )
       nCol += nPart
-   ENDIF
 
-   FOR ii := 1 TO LEN( aButton )
-      __ChangeStyleWindow( aButton[ ii ] :hWnd, WS_TABSTOP,, .F. )
-   NEXT
+      oBtn := TButton() :new( nHeight - 132, nCol, "F4" + CRLF + "DBF", oMain,, nPart - 4, 50,, oFontDefault,, .T.,,,,,,,, lMultiline, )
+      AADD( aButton, oBtn )
+      nCol += nPart
+
+      oBtn := TButton() :new( nHeight - 132, nCol, "F5" + CRLF + "copy", oMain,, nPart - 4, 50,, oFontDefault,, .T.,,,,,,,, lMultiline, )
+      AADD( aButton, oBtn )
+      nCol += nPart
+
+      oBtn := TButton() :new( nHeight - 132, nCol, "F6" + CRLF + "Move", oMain,, nPart - 4, 50,, oFontDefault,, .T.,,,,,,,, lMultiline, )
+      AADD( aButton, oBtn )
+      nCol += nPart
+
+      oBtn := TButton() :new( nHeight - 132, nCol, "F7" + CRLF + "Folder", oMain,, nPart - 4, 50,, oFontDefault,, .T.,,,,,,,, lMultiline, )
+      AADD( aButton, oBtn )
+      nCol += nPart
+
+      oBtn := TButton() :new( nHeight - 132, nCol, "F8" + CRLF + "delete", oMain,, nPart - 4, 50,, oFontDefault,, .T.,,,,,,,, lMultiline, )
+      AADD( aButton, oBtn )
+      nCol += nPart
+
+      oBtn := TButton() :new( nHeight - 132, nCol, "F9" + CRLF + "History", oMain,, nPart - 4, 50,, oFontDefault,, .T.,,,,,,,, lMultiline, )
+      AADD( aButton, oBtn )
+      nCol += nPart
+
+      oBtn := TButton() :new( nHeight - 132, nCol, "F10", oMain,, nPart - 4, 50,, oFontDefault,, .T. )
+      oBtn:bAction := bAction
+      AADD( aButton, oBtn )
+      nCol += nPart
+
+      oBtn := TButton() :new( nHeight - 132, nCol, "F11" + CRLF + "MSC Func", oMain,, nPart - 4, 50,, oFontDefault,, .T.,,,,,,,, lMultiline, )
+      AADD( aButton, oBtn )
+      nCol += nPart
+
+      IF nUseButton = 12
+         oBtn := TButton() :new( nHeight - 132, nCol, "F12", oMain,, nPart - 4, 50,, oFontDefault,, .T. )
+         oBtn:bAction := bAction
+         AADD( aButton, oBtn )
+         nCol += nPart
+      ENDIF
+
+      FOR ii := 1 TO LEN( aButton )
+         __ChangeStyleWindow( aButton[ ii ] :hWnd, WS_TABSTOP,, .F. )
+      NEXT
+   ENDIF
 
 RETURN
 
@@ -1005,16 +1489,17 @@ LOCAL nTop
 LOCAL nBottom
 LOCAL nRight
 LOCAL nLeft
-LOCAL nHeight
+LOCAL nHeight      := oMain:nHeight
 LOCAL nWidth
 LOCAL nPart
-LOCAL nLeftWidth
-LOCAL nRightWidth
+LOCAL nLeftWidth   := oMain:nWidth / 2
+LOCAL nRightWidth  := oMain:nWidth / 2
 LOCAL ii, oBtn, nCol := 0
-LOCAL oCtrol
+LOCAL oCtrol, nDimOld
+LOCAL no_more_oSay := 28
+LOCAL nSplitOff    := 340
 
-STATIC lInit    := .T.
-STATIC nPercent := 50
+STATIC lInit := .T.
 
    LOCKWINDOWUPDATE( oMain:Hwnd )
 
@@ -1022,19 +1507,21 @@ STATIC nPercent := 50
 
    nWidth := oMain:nWidth                                             // 100 %
 
-   DO CASE
-      CASE nSizeType = SIZE_INIT
-         lInit = .F.
+   IF lUse_Splitter = .T.
+      DO CASE
+         CASE nSizeType = SIZE_INIT
+            lInit = .F.
 
-      CASE nSizeType = SIZE_RESTORED .AND. !lInit
-         oSplit:SetPosition( nWidth / 100 * nPercent )
+         CASE nSizeType = SIZE_RESTORED .AND. !lInit
+            oSplit:SetPosition( nWidth / 100 * nPercent )
 
-      CASE nSizeType = SIZE_MINIMIZED
-         RETURN
+         CASE nSizeType = SIZE_MINIMIZED
+            RETURN
 
-      CASE nSizeType = SIZE_MAXIMIZED
-         oSplit:SetPosition( nWidth / 100 * nPercent )
-   ENDCASE
+         CASE nSizeType = SIZE_MAXIMIZED
+            oSplit:SetPosition( nWidth / 100 * nPercent )
+      ENDCASE
+   ENDIF
 
    nPart := oMain:nWidth / 12
 
@@ -1042,106 +1529,154 @@ STATIC nPercent := 50
 
    oCombo_Left:SetPos( 0, 0 )                                         // not need when 0,0
 
-#ifdef Use_Splitter
+   IF lUse_Splitter = .T.
 
-   oSplit:AdjLeft()
-   oSplit:nTop := 70
+      oSplit:AdjLeft()
+      oSplit:nTop := 70 + nSplitOff
 
-   oCtrol := oSplit:aPrevCtrols[ 1 ]
-   nLeftWidth := oCtrol:nWidth
-   nHeight := oCtrol:nHeight
+      oCtrol := oSplit:aPrevCtrols[ 1 ]
+      nLeftWidth := oCtrol:nWidth
+      nHeight := oCtrol:nHeight
 
-   IF nLeftWidth > oMain:nWidth
-      nLeftWidth := oMain:nWidth - 100
-      oSplit:SetPosition( nLeftWidth )
+      IF nLeftWidth > oMain:nWidth
+         nLeftWidth := oMain:nWidth - 100
+         oSplit:SetPosition( nLeftWidth )
+      ENDIF
+
+      oCtrol:nLeft := 0
+      oCtrol:nRight := nLeftWidth - 10
+      oCtrol:nTop := 40
+      oCtrol:nBottom := nHeight - 140 + no_more_oSay
+      oCtrol:SetSize( nLeftWidth, nHeight - 120 + no_more_oSay )
+
+   ELSE
+      nHeight -= 90
+
+      oTab_Left:SetPos( 40, 0 )
+      oTab_Left:SetSize( nLeftWidth, nHeight - 120 + no_more_oSay )
    ENDIF
 
-   oCtrol:nLeft := 0
-   oCtrol:nRight := nLeftWidth - 10
-   oCtrol:nTop := 40
-   oCtrol:nBottom := nHeight - 140
-   oCtrol:SetSize( nLeftWidth, nHeight - 120 )
+   IF lUse_Explorer = .T.
+      IF lUse_TFolderEx = .F.
 
-#ELSE
-   oTab_Left:SetPos( 40, 0 )
-   oTab_Left:SetSize( nLeftWidth, nHeight - 100 )
-#ENDIF
+         nDimOld := nDimLeft
+         FOR ii := 1 TO LEN( oTab_Left:aDialogs )
+            nDimLeft := ii
 
-#ifdef Use_Explorer
-   oExpl_Left:oGrid:SetPos( 10, 0 )
-   oExpl_Left:oGrid:SetSize( nLeftWidth, nHeight - 160 )
-#endif
+            oExpl_Left:oGrid:SetPos( 10, 0 )
+            oExpl_Left:oGrid:SetSize( nLeftWidth - 10, nHeight - 160 + no_more_oSay )
+         NEXT
+         nDimLeft := nDimOld
+      ELSE
+
+         nDimOld := nDimLeft
+         FOR ii := 1 TO LEN( oTab_Left:aDialogs )
+            nDimLeft := ii
+
+            oExpl_Left:oGrid:SetPos( 0, 0 )
+            oExpl_Left:oGrid:SetSize( nLeftWidth - 10, nHeight - 150 + no_more_oSay )
+         NEXT
+         nDimLeft := nDimOld
+      ENDIF
+   ENDIF
 
    // use old nLeftWidth for Position
    oCombo_Right:SetPos( 0, nLeftWidth )
 
    // **************************** right side       **************************
 
-#IFDEF Use_Splitter
+   IF lUse_Splitter = .T.
 
-   oSplit:AdjRight()
-   oSplit:nTop := 70
-   oSplit:nHeight := nHeight - 150
+      oSplit:AdjRight()
+      oSplit:nTop := 70 + nSplitOff
 
-   oCtrol := oSplit:aHindCtrols[ 1 ]
-   nRightWidth := oCtrol:nWidth
-   nHeight := oCtrol:nHeight
+      oSplit:nHeight := nHeight - 150 + no_more_oSay - nSplitOff - nSplitOff
 
-   oCtrol:nLeft := nLeftWidth + 5
-   oCtrol:nRight := nRightWidth - 10
-   oCtrol:nTop := 40
-   oCtrol:nBottom := nHeight - 140
-   oCtrol:SetSize( nRightWidth, nHeight - 120 )
+      oCtrol := oSplit:aHindCtrols[ 1 ]
+      nRightWidth := oCtrol:nWidth
+      nHeight := oCtrol:nHeight
 
-#ELSE
-   oTab_Right:SetPos( 40, nRightWidth )
-   oTab_Right:SetSize( nRightWidth, nHeight - 100 )
-#ENDIF
+      oCtrol:nLeft := nLeftWidth + 5
+      oCtrol:nRight := nRightWidth - 10
+      oCtrol:nTop := 40
+      oCtrol:nBottom := nHeight - 140 + no_more_oSay
+      oCtrol:SetSize( nRightWidth, nHeight - 120 + no_more_oSay )
 
-#ifdef Use_Explorer
-   oExpl_Right:oGrid:SetPos( 10, 0 )
-   oExpl_Right:oGrid:SetSize( nRightWidth, nHeight - 160 )
-#endif
+   ELSE
+      nRightWidth -= 10
 
-   // **************************** NEED Left        **************************
+      oTab_Right:SetPos( 40, nRightWidth )
+      oTab_Right:SetSize( nRightWidth, nHeight - 120 + no_more_oSay )
+   ENDIF
 
-#IFDEF Use_Splitter
-   // need to set again ?!
-   oTab_Left:SetPos( 40, 0 )
-   oTab_Left:SetSize( nLeftWidth, nHeight - 120 )
-#endif
+   IF lUse_Explorer = .T.
+      IF lUse_TFolderEx = .F.
+
+         nDimOld := nDimRight
+         FOR ii := 1 TO LEN( oTab_Right:aDialogs )
+            nDimRight := ii
+
+            oExpl_Right:oGrid:SetPos( 10, 0 )
+            oExpl_Right:oGrid:SetSize( nRightWidth - 10 + 6, nHeight - 160 + no_more_oSay )
+         NEXT
+         nDimRight := nDimOld
+
+      ELSE
+
+         nDimOld := nDimRight
+         FOR ii := 1 TO LEN( oTab_Right:aDialogs )
+            nDimRight := ii
+
+            oExpl_Right:oGrid:SetPos( 0, 0 )
+            oExpl_Right:oGrid:SetSize( nRightWidth - 10 + 6, nHeight - 150 + no_more_oSay )
+         NEXT
+         nDimRight := nDimOld
+
+      ENDIF
+   ENDIF
+
+   // **************************** NEED Left again  **************************
+
+   IF lUse_Splitter = .T.
+      // need to set again ?!
+      oTab_Left:SetPos( 40, 0 )
+      oTab_Left:SetSize( nLeftWidth, nHeight - 120 + no_more_oSay )
+   ENDIF
 
    // **************************** SAY Activ        **************************
 
    nHeight := oMain:nHeight
-   oSayActive:SetPos( nHeight - 160, 10 )
+   // no_more   oSayActive:SetPos( nHeight - 162, 10 )
 
-   // **************************** Volumn Button    **************************
+   // **************************** Volumn Text      **************************
 
    oVol_Left:SetPos( 4, 100 )
-   oVol_Left:SetSize( nLeftWidth - 176, 30 )
+   oVol_Left:SetSize( nLeftWidth - 176 - 20, 30 )
 
    oVol_Right:SetPos( 4, nLeftWidth + 100 )
-   oVol_Right:SetSize( nRightWidth - 164, 30 )
+   oVol_Right:SetSize( nRightWidth - 164 - 20, 30 )
 
    // **************************** Root / Up Button **************************
 
-   oRootLeft :SetPos( 4, nLeftWidth - 74 )
-   oUpLeft:SetPos( 4, nLeftWidth - 40 )
+   oRootLeft :SetPos( 4, nLeftWidth - 74 - 20 )
+   oUpLeft:SetPos( 4, nLeftWidth - 40 - 10 )
 
-   oRootRight:SetPos( 4, oMain:nWidth - 84 )
-   oUpRight:SetPos( 4, oMain:nWidth - 50 )
+   oRootRight:SetPos( 4, oMain:nWidth - 84 - 20 )
+   oUpRight:SetPos( 4, oMain:nWidth - 50 - 10 )
 
    // **************************** Fx Button        **************************
 
-   nWidth := oMain:nWidth
-   nPart := nWidth / nUseButton
+   nWidth  := oMain:nWidth
+   nPart   := nWidth / nUseButton
 
    FOR ii := 1 TO LEN( aButton )
       oBtn := aButton[ ii ]
       oBtn:SetPos( nHeight - 132, nCol )
-      oBtn:SetSize( nPart - 4, 50 )
-
+      IF lUse_BTNBMP = .T.
+         oBtn:SetSize( nPart - 4, 44 )
+      ELSE
+         oBtn:SetSize( nPart - 4, 50 )
+      ENDIF
       nCol += nPart
    NEXT
 
@@ -1159,6 +1694,62 @@ STATIC nPercent := 50
    ELSEIF nPercent > 90
       nPercent := 90
    ENDIF
+
+RETURN
+
+*+--------------------------------------------------------------------
+*+
+*+    Static Procedure NoSplash()
+*+
+*+--------------------------------------------------------------------
+*+
+STATIC PROCEDURE NoSplash( nWinWidth, nWinHeight )
+
+LOCAL bSaveError, oError
+
+   oMain:hide()
+
+   bSaveError := ERRORBLOCK()
+   ERRORBLOCK( { | e | BREAK( e ) } )
+   BEGIN SEQUENCE
+
+      IF lUse_Explorer = .T.
+         oTab_Right:SetFocus()
+         oExpl_Right:oParent := oMain
+         oExpl_Right:FillGrid( LV_NAME, oMain )
+         LV_SETITEMSELECT( oExpl_Right:oGrid:hLv, 1 )
+
+         EVAL( oExpl_Right:oGrid:bAction )
+         // no_more   oExpl_Right:oSayActive:SetText( oExpl_Right:cActiveFile )
+         SayBar( oExpl_Right:cActiveFile )
+         SysRefresh()
+
+         oTab_Left:SetFocus()
+
+         oExpl_Left:oParent := oMain
+         oExpl_Left:FillGrid( LV_NAME, oMain )
+         LV_SETITEMSELECT( oExpl_Left:oGrid:hLv, 1 )
+
+         EVAL( oExpl_Left:oGrid:bAction )
+         // no_more   oExpl_Left:oSayActive:SetText( oExpl_Left:cActiveFile )
+         SayBar( oExpl_Left:cActiveFile )
+         SysRefresh()
+
+         oExpl_Left:oParent := oTab_Left:aDialogs[ 1 ]
+         oExpl_Right:oParent := oTab_Right:aDialogs[ 1 ]
+
+      ENDIF
+
+   RECOVER USING oError
+      ERRORBLOCK( bSaveError )
+      fwlog oError:description, oError:operation, oError:osCode, PROCNAME( 2 ), PROCLINE( 2 )
+   END SEQUENCE
+   ERRORBLOCK( bSaveError )
+
+   oMain:SetSize( nWinWidth, nWinHeight, .F. )
+   oMain:Show()
+
+   oMain:SetFocus()
 
 RETURN
 
@@ -1184,7 +1775,7 @@ LOCAL Hwnd, oRect, nLeftRect, nTopRect, nRightRect, nBottomRect, lhRgn, oImage
    oMain:hide()
 
    DEFINE BITMAP oBmp1 NAME "MYLOGO"
-      DEFINE BITMAP oBmp2 NAME "MYAAAA"
+      DEFINE BITMAP oBmp2 NAME "MYTRANSPARENT"
          DEFINE BRUSH oBrush COLOR CLR_BLUE
             DEFINE FONT oFont NAME "TAHOMA" SIZE 0, - nFontBig
                ACTIVATE FONT oFont
@@ -1195,7 +1786,7 @@ LOCAL Hwnd, oRect, nLeftRect, nTopRect, nRightRect, nBottomRect, lhRgn, oImage
    END BITMAP
 #ENDIF
 
-   nTop -= nSizeH / 2
+   nTop  -= nSizeH / 2
    nLeft -= nSizeW / 2
 
    DEFINE WINDOW oDlg FROM nTop, nLeft TO nTop + nSizeH, nLeft + nSizeW PIXEL STYLE WS_POPUP BRUSH oBrush
@@ -1207,20 +1798,24 @@ LOCAL Hwnd, oRect, nLeftRect, nTopRect, nRightRect, nBottomRect, lhRgn, oImage
    ACTIVATE WINDOW oDlg CENTERED ;
            ON PAINT( PalBmpDraw( oDlg:hDC, 0, 0, oBmp2:hBitmap, 0, 0, 0, SRCPAINT ), ;
            PalBmpDraw( oDlg:hDC, 0, 0, oBmp1:hBitmap, 0, 0, 0, SRCAND ) ) ;
-           ON INIT NowBuildGrid( oDlg, oBmp1, oBmp2, nSizeH, nSizeW )
+           ON INIT NowBuildGrid( oDlg, oBmp1, nSizeH, nSizeW )
 
-   RELEASE FONT oFont
-   RELEASE OBJECTS oBmp1, oBmp2, oBrush
+   oFont:End()
+   oBrush:End()
+   oBmp2:End()
+   // oBmp1:End()
 
    SysRefresh()
-   oExpl_Left:oParent := oTab_Left:aDialogs[ 1 ]
-   oExpl_Right:oParent := oTab_Right:aDialogs[ 1 ]
+
+   IF lUse_Explorer = .T.
+      oExpl_Left:oParent := oTab_Left:aDialogs[ 1 ]
+      oExpl_Right:oParent := oTab_Right:aDialogs[ 1 ]
+   ENDIF
 
    oMain:SetSize( nWinWidth, nWinHeight, .F. )
    oMain:Show()
-   oMain:SetFocus()
 
-   oTab_Left:SetFocus()
+   oMain:SetFocus()
 
 RETURN
 
@@ -1232,23 +1827,44 @@ RETURN
 *+
 *+--------------------------------------------------------------------
 *+
-STATIC PROCEDURE NowBuildGrid( oDlg, oBmp1, oBmp2, nSizeH, nSizeW )
+STATIC PROCEDURE NowBuildGrid( oDlg, oBmp1, nSizeH, nSizeW )
 
-   DlgShow( oDlg, oBmp1, oBmp2 )
+LOCAL bSaveError, oError
 
-#ifdef Use_Explorer
-   oTab_Left:SetFocus()
-   oExpl_Left:oParent := oDlg
-   oExpl_Left:FillGrid( F_NAME, oDlg )
-   LV_SETITEMSELECT( oExpl_Left:oGrid:hLv, 1 )
+   DlgShow( oDlg, oBmp1 )
 
-   oTab_Right:SetFocus()
-   oExpl_Right:oParent := oDlg
-   oExpl_Right:FillGrid( F_NAME, oDlg )
-   LV_SETITEMSELECT( oExpl_Right:oGrid:hLv, 1 )
+   bSaveError := ERRORBLOCK()
+   ERRORBLOCK( { | e | BREAK( e ) } )
+   BEGIN SEQUENCE
 
-   oTab_Left:SetFocus()
-#endif
+      IF lUse_Explorer = .T.
+         oTab_Right:SetFocus()
+         oExpl_Right:oParent := oDlg
+         oExpl_Right:FillGrid( LV_NAME, oDlg )
+         LV_SETITEMSELECT( oExpl_Right:oGrid:hLv, 1 )
+
+         EVAL( oExpl_Right:oGrid:bAction )
+         // no_more   oExpl_Right:oSayActive:SetText( oExpl_Right:cActiveFile )
+         SayBar( oExpl_Right:cActiveFile )
+         SysRefresh()
+
+         oTab_Left:SetFocus()
+         oExpl_Left:oParent := oDlg
+         oExpl_Left:FillGrid( LV_NAME, oDlg )
+         LV_SETITEMSELECT( oExpl_Left:oGrid:hLv, 1 )
+
+         EVAL( oExpl_Left:oGrid:bAction )
+         // no_more   oExpl_Left:oSayActive:SetText( oExpl_Left:cActiveFile )
+         SayBar( oExpl_Left:cActiveFile )
+         SysRefresh()
+
+      ENDIF
+
+   RECOVER USING oError
+      ERRORBLOCK( bSaveError )
+      fwlog oError:description, oError:operation, oError:osCode, PROCNAME( 2 ), PROCLINE( 2 )
+   END SEQUENCE
+   ERRORBLOCK( bSaveError )
 
    oDlg:End()
 RETURN
@@ -1261,7 +1877,7 @@ RETURN
 *+
 *+--------------------------------------------------------------------
 *+
-STATIC PROCEDURE DlgShow( oDlg, oBmp1, oBmp2 )
+STATIC PROCEDURE DlgShow( oDlg, oBmp1 )
 
    oDlg:nWidth := oBmp1:nWidth()
    oDlg:nheight := oBmp1:nHeight()
@@ -1272,6 +1888,7 @@ STATIC PROCEDURE DlgShow( oDlg, oBmp1, oBmp2 )
    SetTransparent( oDlg )
 
    oDlg:Show()
+   SysRefresh()
 
 RETURN
 
@@ -1292,41 +1909,11 @@ RETURN
 
 *+--------------------------------------------------------------------
 *+
-*+    Static Procedure ShowHelp()
-*+
-*+    Called from ( dualgrid.prg )   1 - static procedure showhelp()
-*+
-*+--------------------------------------------------------------------
-*+
-STATIC PROCEDURE ShowHelp()
-
-LOCAL oWnd, oBar
-
-   SETKEY( VK_F1, nil )
-
-   DEFINE WINDOW oWnd TITLE "Dual-Explorer Help"
-
-      DEFINE BUTTONBAR oBar OF oWnd SIZE 50, 25
-         oBar:SetColor( "N/W" )
-
-         oWnd:bKeyChar = { | nKey | IF( nKey == VK_ESCAPE, oWnd:End(), ) }
-
-#IFDEF __HMG__
-      END BUTTONBAR
-   END WINDOW
-#ENDIF
-
-   ACTIVATE DIALOG oWnd ;
-           VALID ( SETKEY( VK_F1, { || ShowHelp() } ), .t. )
-
-RETURN
-
-*+--------------------------------------------------------------------
-*+
 *+    Static Procedure ShowHistory()
 *+
 *+    Called from ( dualgrid.prg )   1 - procedure main()
 *+                                   1 - static procedure domykey()
+*+                                   1 - static procedure makefnbutton()
 *+
 *+--------------------------------------------------------------------
 *+
@@ -1360,6 +1947,7 @@ RETURN
 *+    Static Procedure GoHistory()
 *+
 *+    Called from ( dualgrid.prg )   2 - static procedure showhistory()
+*+                                   1 - class texplorer
 *+
 *+--------------------------------------------------------------------
 *+
@@ -1392,6 +1980,7 @@ RETURN
 *+
 *+    Called from ( dualgrid.prg )   1 - procedure main()
 *+                                   1 - static procedure domykey()
+*+                                   1 - static procedure makefnbutton()
 *+
 *+--------------------------------------------------------------------
 *+
@@ -1403,8 +1992,8 @@ LOCAL oWnd, oLabel_1, oText_1, oBtn
 
    DEFINE WINDOW oWnd FROM 0, 0 TO 180, 300 PIXEL TITLE "Create New Folder" ICON "A1MAIN" COLOR BFcolor, BGcolor NOMINIMIZE NOMAXIMIZE
 
-      @ 010, 010 SAY oLabel_1 PROMPT cSourceDir SIZE 260, 30 PIXEL FONT oFontDefault OF oWnd         
-      @ 040, 010 GET oText_1 VAR cPath SIZE 260, 30 PIXEL FONT oFontDefault                          
+      @ 010, 010 SAY oLabel_1 PROMPT cSourceDir SIZE 260, 30 PIXEL FONT oFontDefault OF oWnd
+      @ 040, 010 GET oText_1 VAR cPath SIZE 260, 30 PIXEL FONT oFontDefault
 
       @ 080, 010 BUTTON oBtn PROMPT "&OK" SIZE 260, 50 PIXEL FONT oFontDefault ACTION( DoCreateFolder( cSourceDir, TRIM( cPath ) ), oWnd:End() ) OF oWnd
 
@@ -1455,22 +2044,36 @@ RETURN
 STATIC PROCEDURE Change2Drive( cString, nNo )
 
 LOCAL cVol_Info
-LOCAL cPath
+LOCAL cNewPath, cOldPath
 LOCAL cDrive    := SUBSTR( cString, 1, 2 )
 
-   cVol_Info := VOLUMENAME( cDrive + "\" ) + SPACE( 5 ) + Diskfree( cDrive )
-
-   cPath := cDrive + "\"
-   nGridFocus := nNo
-
    IF nGridFocus = 1
-      oExpl_Left:oVol_Info:SetText( cVol_Info )
-      oExpl_Left:oGrid:setfocus()
-      oExpl_Left:DoNextFolder( cPath )
+      cOldPath := oExpl_Left:oGrid:cPath
    ELSE
-      oExpl_Right:oVol_Info:SetText( cVol_Info )
-      oExpl_Right:oGrid:setfocus()
-      oExpl_Right:DoNextFolder( cPath )
+      cOldPath := oExpl_Right:oGrid:cPath
+   ENDIF
+
+   IF cDrive <> SUBSTR( cOldPath, 1, 2 )
+      cVol_Info := VOLUMENAME( cDrive + "\" ) + SPACE( 5 ) + Diskfree( cDrive )
+
+      cNewPath := cDrive + "\"
+      nGridFocus := nNo
+
+      IF nGridFocus = 1
+         oExpl_Left:oVol_Info:SetText( cVol_Info )
+         oExpl_Left:oGrid:setfocus()
+         oExpl_Left:DoNextFolder( cNewPath )
+      ELSE
+         oExpl_Right:oVol_Info:SetText( cVol_Info )
+         oExpl_Right:oGrid:setfocus()
+         oExpl_Right:DoNextFolder( cNewPath )
+      ENDIF
+   ELSE
+      IF nGridFocus = 1
+         oExpl_Left:oGrid:setfocus()
+      ELSE
+         oExpl_Right:oGrid:setfocus()
+      ENDIF
    ENDIF
 
 RETURN
@@ -1494,7 +2097,7 @@ STATIC cFilter := "*.*"
 
    DEFINE WINDOW oWnd FROM 0, 0 TO 150, 200 PIXEL TITLE cWhat + " files" ICON "A1MAIN" COLOR BFcolor, BGcolor NOMINIMIZE NOMAXIMIZE
 
-      @ 010, 010 GET oText_1 VAR cFilter SIZE 160, 30 PIXEL FONT oFontDefault OF oWnd UPDATE         
+      @ 010, 010 GET oText_1 VAR cFilter SIZE 160, 30 PIXEL FONT oFontDefault OF oWnd UPDATE
       oText_1:PostMsg( EM_SETSEL, 0, LEN( TRIM( cFilter ) ) )
 
       @ 050, 010 BUTTON oBtn PROMPT "&OK" SIZE 160, 50 PIXEL FONT oFontDefault ACTION DoSetFilter( cFilter, cWhat ) OF oWnd
@@ -1503,8 +2106,10 @@ STATIC cFilter := "*.*"
    END WINDOW
 #ENDIF
 
-   oWnd:bKeyDown := { | nKey, nFlag | IF( nKey = VK_RETURN, ( DoSetFilter( cFilter, cWhat ), oWnd:End() ), IF( nKey = VK_ESCAPE, oWnd:End(), nil ) ) }
    oWnd:bResized := { | nType, nWidth, nHeight | oWnd:SetSize( 200, 150 ) }
+   oWnd:bKeyDown := { | nKey, nFlag | IF( nKey = VK_RETURN, ;
+                      ( DoSetFilter( cFilter, cWhat ), oWnd:End() ), ;
+                      IF( nKey = VK_ESCAPE, oWnd:End(), nil ) ) }
 
    ACTIVATE WINDOW oWnd ON INIT MakeTop( oWnd, oText_1 ) CENTER
 
@@ -1545,10 +2150,11 @@ STATIC PROCEDURE OnDeviceChange( oWnd, nWParam, nLParam )
 
 LOCAL nInfo
 LOCAL aDrives
+LOCAL nOldGrid
 
    DO CASE
       CASE nWParam == 0x0018
-         cDeviceEvent := "config changed"
+         // no_more         cDeviceEvent := "config changed"
          //
          // SysRefresh()
          // SysWait( 0.1 )
@@ -1558,45 +2164,62 @@ LOCAL aDrives
          // endif
          //
       CASE nWParam == 0x8000                                          // DBT_DEVICEARRIVAL
-         cDeviceEvent := "device attached"
-         nInfo := DeviceChangeInfo( nWParam, nLParam )
-         IF !EMPTY( nInfo ) .AND. nInfo > 0
-            cDeviceEvent := BitsToDrive( nInfo ) + "inserted"
-         ENDIF
+         // no_more         cDeviceEvent := "device attached"
+         // no_more         IF hb_OSIS64BIT()
+         // no_more         ELSE
+         // no_more            nInfo := DeviceChangeInfo( nWParam, nLParam )
+         // no_more         ENDIF
+         // no_more         IF !EMPTY( nInfo ) .AND. nInfo > 0
+         // no_more            cDeviceEvent := BitsToDrive( nInfo ) + "inserted"
+         // no_more         ENDIF
       CASE nWParam == 0x8004                                          // DBT_DEVICEREMOVECOMPLETE
-         cDeviceEvent := "device removed"
-         nInfo := DeviceChangeInfo( nWParam, nLParam )
-         IF !EMPTY( nInfo ) .AND. nInfo > 0
-            cDeviceEvent := BitsToDrive( nInfo ) + "removed"
-         ENDIF
+         // no_more         cDeviceEvent := "device removed"
+         // no_more         IF hb_OSIS64BIT()
+         // no_more         ELSE
+         // no_more            nInfo := DeviceChangeInfo( nWParam, nLParam )
+         // no_more         ENDIF
+         // no_more         IF !EMPTY( nInfo ) .AND. nInfo > 0
+         // no_more            cDeviceEvent := BitsToDrive( nInfo ) + "removed"
+         // no_more         ENDIF
       OTHERWISE
    ENDCASE
 
    aDrives := GetAllDrive()
+   nOldGrid := nGridFocus
 
-   oCombo_Left:SetItems( acItem, .T. )
-   oCombo_Left:SetBitmaps( acBitmaps )
+   nGridFocus := 1
+   IF lUse_IconEx = .T.
+   ELSE
+      oCombo_Left:SetItems( acItem, .T. )
+      oCombo_Left:SetBitmaps( acBitmaps )
+   ENDIF
+
    IF ASCAN( aDrives, { | x | x = SUBSTR( oExpl_Left:oGrid:cPath, 1, 1 ) } ) > 0
       oCombo_left:Select( DriveNumber( oExpl_Left:oGrid:cPath ) )
    ELSE
-      nGridFocus := 1
       oCombo_left:Select( DriveNumber( "C" ) )
       oExpl_Left:oGrid:cPath := "C:\"
       oExpl_Left:FillGrid()
       LV_SETITEMSELECT( oExpl_Left:oGrid:hLv, 1 )
    ENDIF
 
-   oCombo_Right:SetItems( acItem, .T. )
-   oCombo_Right:SetBitmaps( acBitmaps )
+   nGridFocus := 2
+   IF lUse_IconEx = .T.
+   ELSE
+      oCombo_Right:SetItems( acItem, .T. )
+      oCombo_Right:SetBitmaps( acBitmaps )
+   ENDIF
+
    IF ASCAN( aDrives, { | x | x = SUBSTR( oExpl_Right:oGrid:cPath, 1, 1 ) } ) > 0
       oCombo_Right:Select( DriveNumber( oExpl_Right:oGrid:cPath ) )
    ELSE
-      nGridFocus := 2
       oCombo_Right:Select( DriveNumber( "C" ) )
       oExpl_Right:oGrid:cPath := "C:\"
       oExpl_Right:FillGrid()
       LV_SETITEMSELECT( oExpl_Right:oGrid:hLv, 1 )
    ENDIF
+
+   nGridFocus := nOldGrid
 
    oWnd:Refresh()
 
@@ -1645,33 +2268,33 @@ LOCAL hGridO
    // first Target (while Focus stay on last)
    jMax := LEN( aTarget )
    FOR jj := 2 TO jMax
-      cName := TRIM( aTarget[ jj ] [ F_NAME ] )
-      nSize := aTarget[ jj ] [ F_SIZE ]
-      dDate := aTarget[ jj ] [ F_DATE ]
-      cTime := aTarget[ jj ] [ F_TIME ]
-      cAttr := aTarget[ jj ] [ F_ATTR ]
+      cName := TRIM( aTarget[ jj ] [ LV_NAME ] )
+      nSize := aTarget[ jj ] [ LV_SIZE ]
+      dDate := aTarget[ jj ] [ LV_DATE ]
+      cTime := aTarget[ jj ] [ LV_TIME ]
+      cAttr := aTarget[ jj ] [ LV_ATTR ]
 
       IF "D" $ cAttr
          LOOP
       ENDIF
 
       // check if Source exist
-      nPosi := ASCAN( aSource, { | x | LOWER( x[ F_NAME ] ) = LOWER( cName ) } )
+      nPosi := ASCAN( aSource, { | x | LOWER( x[ LV_NAME ] ) = LOWER( cName ) } )
       IF nPosi > 0
          DO CASE
-            CASE aSource[ nPosi ] [ F_SIZE ] < 2                      // old Dummy files
+            CASE aSource[ nPosi ] [ LV_SIZE ] < 2                     // old Dummy files
 
-            CASE nSize <> aSource[ nPosi ] [ F_SIZE ]                 // Target Size is different
-               ItemMark( hGridO, jj, nState, nMask )
+            CASE nSize <> aSource[ nPosi ] [ LV_SIZE ]                // Target Size is different
+               DoItemMark( hGridO, jj, nState, nMask )
                AADD( aTMarked, jj )
 
-            CASE dDate <> aSource[ nPosi ] [ F_DATE ]                 // Target Date is different
-               ItemMark( hGridO, jj, nState, nMask )
+            CASE dDate <> aSource[ nPosi ] [ LV_DATE ]                // Target Date is different
+               DoItemMark( hGridO, jj, nState, nMask )
                AADD( aTMarked, jj )
 
-            CASE dDate = aSource[ nPosi ] [ F_DATE ]                  // Target Date is same
-               IF HMS2Sec( cTime ) > HMS2Sec( aSource[ nPosi ] [ F_TIME ] ) + 2
-                  ItemMark( hGridO, jj, nState, nMask )
+            CASE dDate = aSource[ nPosi ] [ LV_DATE ]                 // Target Date is same
+               IF HMS2Sec( cTime ) > HMS2Sec( aSource[ nPosi ] [ LV_TIME ] ) + 2
+                  DoItemMark( hGridO, jj, nState, nMask )
                   AADD( aTMarked, jj )
                ENDIF
 
@@ -1679,13 +2302,13 @@ LOCAL hGridO
                DiffCompare( TIME(), ii, aSource[ ii ], nPosi, aTarget[ nPosi ] )
          ENDCASE
       ELSE
-         ItemMark( hGridO, jj, nState, nMask )
+         DoItemMark( hGridO, jj, nState, nMask )
          AADD( aTMarked, jj )
       ENDIF
    NEXT
 
    IF EMPTY( aTMarked )
-      ItemUnMark( hGridO, - 1, 0, LVIS_FOCUSED )
+      DoItemUnMark( hGridO, - 1, 0, LVIS_FOCUSED )
    ENDIF
 
    //  ------------------------------------------------------------------ *
@@ -1693,11 +2316,11 @@ LOCAL hGridO
    // now Source. Focus stay on last which is Source
    iMax := LEN( aSource )
    FOR ii := 2 TO iMax
-      cName := TRIM( aSource[ ii ] [ F_NAME ] )
-      nSize := aSource[ ii ] [ F_SIZE ]
-      dDate := aSource[ ii ] [ F_DATE ]
-      cTime := aSource[ ii ] [ F_TIME ]
-      cAttr := aSource[ ii ] [ F_ATTR ]
+      cName := TRIM( aSource[ ii ] [ LV_NAME ] )
+      nSize := aSource[ ii ] [ LV_SIZE ]
+      dDate := aSource[ ii ] [ LV_DATE ]
+      cTime := aSource[ ii ] [ LV_TIME ]
+      cAttr := aSource[ ii ] [ LV_ATTR ]
 
       // not want
       IF "D" $ cAttr
@@ -1705,24 +2328,24 @@ LOCAL hGridO
       ENDIF
 
       // check if Target exist
-      nPosi := ASCAN( aTarget, { | x | LOWER( x[ F_NAME ] ) = LOWER( cName ) } )
+      nPosi := ASCAN( aTarget, { | x | LOWER( x[ LV_NAME ] ) = LOWER( cName ) } )
       IF nPosi > 0
          DO CASE
-            CASE aTarget[ nPosi ] [ F_SIZE ] < 2                      // old Dummy files
+            CASE aTarget[ nPosi ] [ LV_SIZE ] < 2                     // old Dummy files
 
-            CASE nSize <> aTarget[ nPosi ] [ F_SIZE ]                 // Source Size is different
-               ItemMark( hGridS, ii, nState, nMask )
+            CASE nSize <> aTarget[ nPosi ] [ LV_SIZE ]                // Source Size is different
+               DoItemMark( hGridS, ii, nState, nMask )
                AADD( aSMarked, ii )
 
-            CASE dDate <> aTarget[ nPosi ] [ F_DATE ]                 // Source Date is different
-               ItemMark( hGridS, ii, nState, nMask )
+            CASE dDate <> aTarget[ nPosi ] [ LV_DATE ]                // Source Date is different
+               DoItemMark( hGridS, ii, nState, nMask )
                AADD( aSMarked, ii )
 
-            CASE dDate = aTarget[ nPosi ] [ F_DATE ]                  // Source Date is same
+            CASE dDate = aTarget[ nPosi ] [ LV_DATE ]                 // Source Date is same
 
                // check if Source Time is newer
-               IF HMS2Sec( cTime ) > HMS2Sec( aTarget[ nPosi ] [ F_TIME ] ) + 2
-                  ItemMark( hGridS, ii, nState, nMask )
+               IF HMS2Sec( cTime ) > HMS2Sec( aTarget[ nPosi ] [ LV_TIME ] ) + 2
+                  DoItemMark( hGridS, ii, nState, nMask )
                   AADD( aSMarked, ii )
                ENDIF
 
@@ -1731,13 +2354,13 @@ LOCAL hGridO
          ENDCASE
       ELSE
          // get New File Position and mark it
-         ItemMark( hGridS, ii, nState, nMask )
+         DoItemMark( hGridS, ii, nState, nMask )
          AADD( aSMarked, ii )
       ENDIF
    NEXT
 
    IF EMPTY( aSMarked )
-      ItemUnMark( hGridS, - 1, 0, LVIS_FOCUSED )
+      DoItemUnMark( hGridS, - 1, 0, LVIS_FOCUSED )
    ENDIF
 
    //  ------------------------------------------------------------------ *
@@ -1774,13 +2397,14 @@ RETURN
 
 *+--------------------------------------------------------------------
 *+
-*+    Static Procedure ItemMark()
+*+    Static Procedure DoItemMark()
 *+
 *+    Called from ( dualgrid.prg )   8 - static procedure comparedir()
+*+                                   1 - class texplorer
 *+
 *+--------------------------------------------------------------------
 *+
-STATIC PROCEDURE ItemMark( hGrid, nPos, nState, nMask )
+STATIC PROCEDURE DoItemMark( hGrid, nPos, nState, nMask )
 
    DEFAULT nState TO hb_BitOr( LVIS_SELECTED, LVIS_FOCUSED )
    DEFAULT nMask TO hb_BitOr( LVIS_SELECTED, LVIS_FOCUSED )
@@ -1791,13 +2415,14 @@ RETURN
 
 *+--------------------------------------------------------------------
 *+
-*+    Static Procedure ItemUnMark()
+*+    Static Procedure DoItemUnMark()
 *+
 *+    Called from ( dualgrid.prg )   2 - static procedure comparedir()
+*+                                   1 - class texplorer
 *+
 *+--------------------------------------------------------------------
 *+
-STATIC PROCEDURE ItemUnMark( hGrid, nPos, nState, nMask )
+STATIC PROCEDURE DoItemUnMark( hGrid, nPos, nState, nMask )
 
    DEFAULT nState TO hb_BitOr( LVIS_SELECTED, LVIS_FOCUSED )
    DEFAULT nMask TO hb_BitOr( LVIS_SELECTED, LVIS_FOCUSED )
@@ -1808,37 +2433,11 @@ RETURN
 
 *+--------------------------------------------------------------------
 *+
-*+    Static Procedure GodMode()
-*+
-*+    Called from ( dualgrid.prg )   1 - procedure main()
-*+
-*+--------------------------------------------------------------------
-*+
-STATIC PROCEDURE GodMode()
-
-LOCAL cText
-LOCAL oWSHShell
-LOCAL bSaveError := ERRORBLOCK( { | oErr | BREAK( oErr ) } )
-
-   cText := GETENV( "windir" )
-   cText += "\explorer.exe shell:::{ED7BA470-8E54-465E-825C-99712043E01C}"
-
-   BEGIN SEQUENCE
-      oWSHShell := createobject( "wscript.shell" )
-      oWSHShell:run( cText )
-
-      oWSHShell:Destroy()
-   END SEQUENCE
-   ERRORBLOCK( bSaveError )
-
-RETURN
-
-*+--------------------------------------------------------------------
-*+
 *+    Static Procedure Viewer()
 *+
 *+    Called from ( dualgrid.prg )   1 - procedure main()
 *+                                   1 - static procedure domykey()
+*+                                   1 - static procedure makefnbutton()
 *+
 *+--------------------------------------------------------------------
 *+
@@ -1859,7 +2458,7 @@ LOCAL aItem, cPath, aSource, cFile := "", cExt
    IF EMPTY( aItem )
    ELSE
       IF VALTYPE( aItem ) = "A"
-         cFile := aSource[ aItem[ 1 ] ] [ F_NAME ]
+         cFile := aSource[ aItem[ 1 ] ] [ LV_NAME ]
       ENDIF
    ENDIF
 
@@ -1898,6 +2497,7 @@ LOCAL nRec
    cAlias := ALIAS()
 
    DEFINE WINDOW oWnd FROM 0, 0 TO 1024, 1280 PIXEL TITLE "DBF " + cFile ICON "A1MAIN" COLOR BFcolor, BGcolor
+      HideShow( oWnd, .F. )
 
       DEFINE BUTTONBAR oBar SIZE 96, 48 OF oWnd
          DEFINE BUTTON OF oBar PROMPT "&Codepage" ;
@@ -1923,8 +2523,26 @@ LOCAL nRec
    oBrwDBF:CreateFromCode()
 
    oWnd:oClient := oBrwDBF
-   ACTIVATE WINDOW oWnd VALID DoClose() CENTER
+   ACTIVATE WINDOW oWnd ON INIT HideShow( oWnd ) VALID DoClose() CENTER
 
+RETURN
+
+*+--------------------------------------------------------------------
+*+
+*+    Static Procedure HideShow()
+*+
+*+    Called from ( dualgrid.prg )   2 - static procedure doshowdbf()
+*+
+*+--------------------------------------------------------------------
+*+
+STATIC PROCEDURE HideShow( oWnd, lShow )
+
+   DEFAULT lShow := .T.
+   IF lShow = .T.
+      oWnd:Show()
+   ELSE
+      oWnd:Hide()
+   ENDIF
 RETURN
 
 *+--------------------------------------------------------------------
@@ -1953,7 +2571,7 @@ RETURN
 *+    Static Procedure NewTab()
 *+
 *+    Called from ( dualgrid.prg )   1 - static procedure domykey()
-*+                                   1 - class texplorer
+*+                                   2 - class texplorer
 *+
 *+--------------------------------------------------------------------
 *+
@@ -1968,6 +2586,7 @@ LOCAL nHeight      := 1024
 LOCAL oObj, aDirTemp
 LOCAL oVolLeft, oComboLeft
 LOCAL oVolRight, oComboRight
+LOCAL lCheckbox, lDispInfo
 
 STATIC nPageLeft  := 1
 STATIC nPageRight := 1
@@ -1983,33 +2602,44 @@ STATIC nPageRight := 1
 
       // save
       oObj := oTab_Left
-      cInitPath := cPath_Left
-      aDirTemp := ACLONE( aDir_Left )
-      oVolLeft := oExpl_Left:oVol_Info
+
+      cInitPath  := cPath_Left
+      aDirTemp   := ACLONE( aDir_Left )
+      oVolLeft   := oExpl_Left:oVol_Info
       oComboLeft := oExpl_Left:oCombo_Info
+      lDispInfo  := oExpl_Left:oGrid:lDispInfo
+      lCheckbox  := oExpl_Left:lCheckbox
 
       // new
       oTab_Left:AddItem( cCaption )
 
       // fill Stack
-      AADD( Stack_Left, ARRAY( 6 ) )
-      nDimLeft := LEN( Stack_Left )
+      AADD( Stack_Left, ARRAY( 4 ) )
+      nDimLeft   := LEN( Stack_Left )
       cPath_Left := cInitPath
-      aDir_Left := ACLONE( aDirTemp )
+      aDir_Left  := ACLONE( aDirTemp )
+      oTab_Left  := oObj
 
-      oTab_Left := oObj
-      oTab_Left:bChange := { || nDimLeft := oTab_Left:nOption }
+      IF lUse_TFolderEx = .F.
+         oTab_Left:bChange := { || nDimLeft := oTab_Left:nOption }
+      ELSE
+         oTab_Left:bAction := { || nDimLeft := oTab_Left:nOption }
+
+         oTab_Left:SetBitmap( "MYGREEN", nDimLeft )
+         oTab_Left:Update()
+      ENDIF
 
       // new Explorer
-      oExpl_Left := TExplorer() :New( oTab_Left:aDialogs[ nDimLeft ], 10, 0, ( nWidth / 2 ) - 20, nHeight - 220, cInitPath, nIcoLarge, nIcoSmall )
-      oExpl_Left:oGrid:bGotFocus := { || nGridFocus := 1, UpDateInfo( oExpl_Left:oGrid ) }
-
-      oExpl_Left:oSayActive := oSayActive
+      oExpl_Left := TExplorer() :New( oTab_Left:aDialogs[ nDimLeft ], 10, 0, ( nWidth / 2 ) - 20 + 6, nHeight - 210, cInitPath, nIcoLarge, nIcoSmall, lCheckbox, lDispInfo )
+      oExpl_Left:oGrid:bGotFocus := { || nGridFocus := 1, UpDateInfo( oExpl_Left:oGrid, oTab_Left ) }
+      // no_more      oExpl_Left:oSayActive := oSayActive
       oExpl_Left:oVol_Info := oVolLeft
       oExpl_Left:oCombo_Info := oComboLeft
-
       oExpl_Left:oParent := oTab_Left:aDialogs[ nDimLeft ]
-      oExpl_Left:FillGrid( F_NAME, oTab_Left:aDialogs[ nDimLeft ] )
+      oExpl_Left:FillGrid( LV_NAME, oTab_Left:aDialogs[ nDimLeft ] )
+      oExpl_Left:oGrid:SetPos( 0, 0 )
+
+      oTab_Left:SetFocus()
       LV_SETITEMSELECT( oExpl_Left:oGrid:hLv, 1 )
 
    ELSE
@@ -2020,33 +2650,44 @@ STATIC nPageRight := 1
 
       // save
       oObj := oTab_Right
-      cInitPath := cPath_Right
-      aDirTemp := ACLONE( aDir_Right )
-      oVolRight := oExpl_Right:oVol_Info
+
+      cInitPath   := cPath_Right
+      aDirTemp    := ACLONE( aDir_Right )
+      oVolRight   := oExpl_Right:oVol_Info
       oComboRight := oExpl_Right:oCombo_Info
+      lDispInfo   := oExpl_Right:oGrid:lDispInfo
+      lCheckbox   := oExpl_Right:lCheckbox
 
       // new
       oTab_Right:AddItem( cCaption )
 
       // fill Stack
-      AADD( Stack_Right, ARRAY( 6 ) )
-      nDimRight := LEN( Stack_Right )
+      AADD( Stack_Right, ARRAY( 4 ) )
+      nDimRight   := LEN( Stack_Right )
       cPath_Right := cInitPath
-      aDir_Right := ACLONE( aDirTemp )
+      aDir_Right  := ACLONE( aDirTemp )
+      oTab_Right  := oObj
 
-      oTab_Right := oObj
-      oTab_Right:bChange := { || nDimRight := oTab_Right:nOption }
+      IF lUse_TFolderEx = .F.
+         oTab_Right:bChange := { || nDimRight := oTab_Right:nOption }
+      ELSE
+         oTab_Right:bAction := { || nDimRight := oTab_Right:nOption }
+
+         oTab_Right:SetBitmap( "MYGREEN", nDimRight )
+         oTab_Right:Update()
+      ENDIF
 
       // new Explorer
-      oExpl_Right := TExplorer() :New( oTab_Right:aDialogs[ nDimRight ], 10, 0, ( nWidth / 2 ) - 20, nHeight - 220, cInitPath, nIcoLarge, nIcoSmall )
-      oExpl_Right:oGrid:bGotFocus := { || nGridFocus := 2, UpDateInfo( oExpl_Right:oGrid ) }
-
-      oExpl_Right:oSayActive := oSayActive
+      oExpl_Right := TExplorer() :New( oTab_Right:aDialogs[ nDimRight ], 10, 0, ( nWidth / 2 ) - 20 - 7, nHeight - 210, cInitPath, nIcoLarge, nIcoSmall, lCheckbox, lDispInfo )
+      oExpl_Right:oGrid:bGotFocus := { || nGridFocus := 2, UpDateInfo( oExpl_Right:oGrid, oTab_Right ) }
+      // no_more      oExpl_Right:oSayActive := oSayActive
       oExpl_Right:oVol_Info := oVolRight
       oExpl_Right:oCombo_Info := oComboRight
-
       oExpl_Right:oParent := oTab_Right:aDialogs[ nDimRight ]
-      oExpl_Right:FillGrid( F_NAME, oTab_Right:aDialogs[ nDimRight ] )
+      oExpl_Right:FillGrid( LV_NAME, oTab_Right:aDialogs[ nDimRight ] )
+      oExpl_Right:oGrid:SetPos( 0, 0 )
+
+      oTab_Right:SetFocus()
       LV_SETITEMSELECT( oExpl_Right:oGrid:hLv, 1 )
 
    ENDIF
@@ -2057,7 +2698,7 @@ RETURN
 *+
 *+    Static Procedure DelThisTab()
 *+
-*+    Called from ( dualgrid.prg )   1 - class texplorer
+*+    Called from ( dualgrid.prg )   2 - class texplorer
 *+
 *+--------------------------------------------------------------------
 *+
@@ -2071,7 +2712,11 @@ LOCAL nStackNumber := 0
       IF nStackNumber > 1
          nPos := oTab_Left:nOption
          IF nPos <= nStackNumber
-            oTab_Left:DelItemPos( nPos )
+            IF lUse_TFolderEx = .F.
+               oTab_Left:DelItemPos( nPos )
+            ELSE
+               oTab_Left:DelItem( nPos )
+            ENDIF
             ADEL( Stack_Left, nPos )
             ASIZE( Stack_Left, LEN( Stack_Left ) - 1 )
             IF nPos > LEN( Stack_Left )
@@ -2081,14 +2726,19 @@ LOCAL nStackNumber := 0
             ENDIF
          ENDIF
       ENDIF
+      oTab_Left:SetFocus()
+
    ELSE
 
       nStackNumber := LEN( Stack_Right )
       IF nStackNumber > 1
          nPos := oTab_Right:nOption
          IF nPos <= nStackNumber
-            oExpl_Right:Destroy()
-            oTab_Right:DelItemPos( nPos )
+            IF lUse_TFolderEx = .F.
+               oTab_Right:DelItemPos( nPos )
+            ELSE
+               oTab_Right:DelItem( nPos )
+            ENDIF
             ADEL( Stack_Right, nPos )
             ASIZE( Stack_Right, LEN( Stack_Right ) - 1 )
             IF nPos > LEN( Stack_Right )
@@ -2098,6 +2748,8 @@ LOCAL nStackNumber := 0
             ENDIF
          ENDIF
       ENDIF
+      oTab_Right:SetFocus()
+
    ENDIF
 
 RETURN
@@ -2111,30 +2763,103 @@ RETURN
 *+
 *+--------------------------------------------------------------------
 *+
-STATIC PROCEDURE UpDateInfo( oGrid )
+STATIC PROCEDURE UpDateInfo( oGrid, oTab )
 
 LOCAL cDrive, cVol_Info
-LOCAL cPath, nRec, aItem
+LOCAL cPath, aItem, nTabs
+LOCAL nOption := oTab:nOption
 
-   cPath := oGrid:cPath
-   aItem := oGrid:Getdata()
+   IF nGridFocus = 1
+      nDimLeft := nOption
+      cPath := cPath_Left
+      nTabs := LEN( Stack_Left )
+   ELSE
+      nDimRight := nOption
+      cPath := cPath_Right
+      nTabs := LEN( Stack_Right )
+   ENDIF
 
    cDrive := SUBSTR( cPath, 1, 2 )
    cVol_Info := VOLUMENAME( cDrive + "\" ) + SPACE( 5 ) + Diskfree( cDrive )
 
    IF nGridFocus = 1
       oCombo_left:Select( DriveNumber( cPath ) )
-      oExpl_Left:oVol_Info:SetText( cVol_Info )
+      oCombo_left:GetKeyChar( ASC( SUBSTR( cPath, 1, 1 ) ) )
+      oCombo_left:update()
 
-      oExpl_Left:oSayActive:SetText( oExpl_Left:cActiveFile )
+      oExpl_Left:oVol_Info:SetText( cVol_Info )
+      // no_more      oExpl_Left:oSayActive:SetText( oExpl_Left:cActiveFile )
+      SayBar( oExpl_Left:cActiveFile )
    ELSE
       oCombo_Right:Select( DriveNumber( cPath ) )
+      oCombo_Right:update()
+
       oExpl_Right:oVol_Info:SetText( cVol_Info )
-      oExpl_Right:oSayActive:SetText( oExpl_Right:cActiveFile )
+      // no_more      oExpl_Right:oSayActive:SetText( oExpl_Right:cActiveFile )
+      SayBar( oExpl_Right:cActiveFile )
    ENDIF
 
-   IF !EMPTY( aItem )
-      nRec := aItem[ 1 ]
+   IF lUse_TFolderEx = .F.
+   ELSE
+      NewActiveIcon( oTab, nTabs )
+   ENDIF
+
+RETURN
+
+*+--------------------------------------------------------------------
+*+
+*+    Static Procedure NewActiveIcon()
+*+
+*+    Called from ( dualgrid.prg )   1 - static procedure updateinfo()
+*+
+*+--------------------------------------------------------------------
+*+
+STATIC PROCEDURE NewActiveIcon( oTab, nTabs )
+
+LOCAL ii, iMax
+LOCAL nOption, nBitmaps
+LOCAL bSaveError, oError
+
+   IF VALTYPE( oTab ) = "O" .AND. oTab:IsKindOf( "TFOLDEREX" )
+
+#ifdef Use_SEQUENCE                              // does have Side-Effect
+      bSaveError := ERRORBLOCK()
+      ERRORBLOCK( { | e | BREAK( e ) } )
+      BEGIN SEQUENCE
+#endif
+
+         nOption := oTab:nOption
+         IF EMPTY( nOption )
+            nOption := 1
+         ENDIF
+
+         nBitmaps := LEN( oTab:aBitmaps )
+
+         IF nTabs <> nBitmaps
+            nTabs := MIN( nTabs, nBitmaps )
+         ENDIF
+
+         IF !EMPTY( nTabs )
+            FOR ii := 1 TO nTabs
+               IF ii = nOption
+                  oTab:SetBitmap( "MYGREEN", nOption )
+               ELSE
+                  oTab:SetBitmap( "MYTRANSPARENT", ii )
+               ENDIF
+               //  fwlog ii, nTabs, Procname(2),Procline(2)
+
+               oTab:Update()
+            NEXT
+         ENDIF
+
+#ifdef Use_SEQUENCE
+      RECOVER USING oError
+         ERRORBLOCK( bSaveError )
+         fwlog oError:description, oError:operation, oError:osCode, PROCNAME( 2 ), PROCLINE( 2 ), ii, nOption
+      END SEQUENCE
+      ERRORBLOCK( bSaveError )
+#endif
+
    ENDIF
 
 RETURN
@@ -2166,9 +2891,6 @@ LOCAL lRet := .T.
    aRect := oMain:GetRect()
 
    //  Everything
-   //    IF !EMPTY( hDll )
-   //       FreeLibrary( hDll )
-   //    ENDIF
 RETURN lRet
 
 *+--------------------------------------------------------------------
@@ -2241,57 +2963,6 @@ RETURN aDrives
 
 *+--------------------------------------------------------------------
 *+
-*+    Static Function BitsToDrive()
-*+
-*+    Called from ( dualgrid.prg )   2 - static procedure ondevicechange()
-*+
-*+--------------------------------------------------------------------
-*+
-STATIC FUNCTION BitsToDrive( nBitmap )
-
-LOCAL n      := 0
-LOCAL cDrive := ""
-
-   DO WHILE nBitmap > 0
-      IF nBitmap == 1
-         cDrive := CHR( n + 65 ) + ": "
-         EXIT
-      ENDIF
-      nBitmap := INT( nBitmap / 2 )
-      n ++
-   ENDDO
-
-RETURN cDrive
-
-*+--------------------------------------------------------------------
-*+
-*+    Static Function WinExeError()
-*+
-*+--------------------------------------------------------------------
-*+
-STATIC FUNCTION WinExeError()
-
-LOCAL aError := {}
-   AADD( aError, { 1, "System was out of memory, executable file was corrupt, or relocations were invalid." } )
-   AADD( aError, { 2, "File was not found." } )
-   AADD( aError, { 3, "Path was not found." } )
-   AADD( aError, { 5, "Attempt was made to dynamically link to a task, or there was a sharing or network-protection error." } )
-   AADD( aError, { 6, "Library required separate data segments for each task." } )
-   AADD( aError, { 8, "There was insufficient memory to start the application." } )
-   AADD( aError, { 10, "Windows version was incorrect." } )
-   AADD( aError, { 11, "Executable file was invalid. Either it was not a Windows application or there was an error in the .EXE image." } )
-   AADD( aError, { 12, "Application was designed for a different operating system." } )
-   AADD( aError, { 13, "Application was designed for MS-DOS 4.0." } )
-   AADD( aError, { 14, "Type of executable file was unknown." } )
-   AADD( aError, { 15, "Attempt was made to load a real-mode application (developed for an earlier version of Windows)." } )
-   AADD( aError, { 16, "Attempt was made to load a second instance of an executable file containing multiple data segments that were not marked read-only." } )
-   AADD( aError, { 19, "Attempt was made to load a compressed executable file. The file must be decompressed before it can be loaded." } )
-   AADD( aError, { 20, "Dynamic-link library (DLL) file was invalid. One of the DLLs required to run this application was corrupt." } )
-   AADD( aError, { 21, "Application requires 32-bit extensions." } )
-RETURN aError
-
-*+--------------------------------------------------------------------
-*+
 *+    Static Function Diskfree()
 *+
 *+    Called from ( dualgrid.prg )   2 - procedure main()
@@ -2322,9 +2993,9 @@ RETURN cRet
 *+
 *+--------------------------------------------------------------------
 *+
-STATIC FUNCTION DoSH3func( cAction, lConfirm, lPaperbin, acFiles, acTarget )
+STATIC FUNCTION DoSH3func( cAction, lConfirm, lPaperbin, acFiles, acTarget, nSourceSide )
 
-LOCAL nFocus := nGridFocus
+LOCAL nFocus := nSourceSide
 LOCAL iMax   := LEN( acFiles )
 LOCAL lRet   := .F.
 LOCAL nHWnd, nFunc, fFlag
@@ -2375,14 +3046,15 @@ LOCAL nHWnd, nFunc, fFlag
    SysWait( 0.5 )
 
    IF cAction = "DELETE"
-      IF nGridFocus = 1
+      SysWait( 0.5 )
+      IF nSourceSide = 1
          oExpl_Left:DoNextFolder( oExpl_Left:oGrid:cPath )
       ELSE
          oExpl_Right:DoNextFolder( oExpl_Right:oGrid:cPath )
       ENDIF
 
    ELSEIF cAction = "COPY"
-      IF nGridFocus = 1
+      IF nSourceSide = 1
          oExpl_Right:DoNextFolder( oExpl_Right:oGrid:cPath )
       ELSE
          oExpl_Left:DoNextFolder( oExpl_Left:oGrid:cPath )
@@ -2487,6 +3159,83 @@ RETURN NIL
 
 *+--------------------------------------------------------------------
 *+
+*+    Static Function CopyToClipboard()
+*+
+*+    Called from ( dualgrid.prg )   1 - class texplorer
+*+
+*+--------------------------------------------------------------------
+*+
+STATIC FUNCTION CopyToClipboard( cText )
+
+LOCAL oClip := TClipBoard() :New()
+
+   IF oClip:Open()
+      oClip:SetText( cText )
+      oClip:Close()
+   ENDIF
+
+   oClip:End()
+RETURN nil
+
+*+--------------------------------------------------------------------
+*+
+*+    Static Function TextFromClipboard()
+*+
+*+    Called from ( dualgrid.prg )   1 - class texplorer
+*+
+*+--------------------------------------------------------------------
+*+
+STATIC FUNCTION TextFromClipboard()
+
+LOCAL cText := ""
+LOCAL oClip := TClipBoard() :New()
+
+   IF oClip:Open()
+      cText := oClip:GetText()
+      oClip:Close()
+
+      IF CRLF $ cText
+         cText := TRIM( STRTRAN( cText, CRLF, "" ) )
+      ENDIF
+
+   ENDIF
+
+   oClip:End()
+RETURN cText
+
+*+--------------------------------------------------------------------
+*+
+*+    Static Function IsFileInPath()
+*+
+*+    Called from ( dualgrid.prg )   1 - class texplorer
+*+
+*+--------------------------------------------------------------------
+*+
+STATIC FUNCTION IsFileInPath( cFile )
+
+LOCAL cEnv := GETENV( "PATH" )
+LOCAL cRet := ""
+LOCAL ii, iMax, aToken, cSeek
+
+   aToken := AtInside( ";", cEnv )
+   AADD( aToken, hb_Dirbase() )
+
+   iMax := LEN( aToken )
+   FOR ii := 1 TO iMax
+      cSeek := TRIM( EndwithSlash( aToken[ ii ] ) )
+      IF EMPTY( cSeek )
+         LOOP
+      ENDIF
+      IF FILE( cSeek + cFile )
+         cRet := cSeek + cFile
+         EXIT
+      ENDIF
+   NEXT
+
+RETURN cRet
+
+*+--------------------------------------------------------------------
+*+
 *+    Procedure MakeTop()
 *+
 *+    Called from ( codepage.prg )   1 - procedure changecodepage()
@@ -2534,22 +3283,21 @@ LOCAL nTop0, nLeft0, nWidth0, nHeight0
 
    hWnd := oObj:hWnd
 
-   nTop0 := oParent:nTop
-   nLeft0 := oParent:nLeft
-   nWidth0 := oParent:nWidth
+   nTop0    := oParent:nTop
+   nLeft0   := oParent:nLeft
+   nWidth0  := oParent:nWidth
    nHeight0 := oParent:nHeight
 
-   nTop := oObj:nTop
-   nLeft := oObj:nLeft
-   nWidth := oObj:nWidth
-   nHeight := oObj:nHeight
+   nTop     := oObj:nTop
+   nLeft    := oObj:nLeft
+   nWidth   := oObj:nWidth
+   nHeight  := oObj:nHeight
 
    // Center of control
-   nRow := nTop0 + nTop + ( nHeight )
+   nRow := nTop0  + nTop  + ( nHeight )
    nCol := nLeft0 + nLeft + ( nWidth / 2 )
 
    SETCURSORPOS( nCol, nRow )
-   //   oObj:Setfocus()
 
 RETURN
 
@@ -2557,18 +3305,23 @@ RETURN
 *+
 *+    Procedure SayBar()
 *+
-*+    Called from ( tgrid.prg )   1 - class tgrid
+*+    Called from ( dualgrid.prg )   2 - static procedure nosplash()
+*+                                   2 - static procedure nowbuildgrid()
+*+                                   2 - static procedure updateinfo()
+*+                                   1 - class texplorer
 *+
 *+--------------------------------------------------------------------
 *+
 PROCEDURE SayBar( cText, nPart )
 
    DEFAULT nPart := 1
-   // how does Statusbar work ?
-   //
-   //   oStatusBar:SetPartText( nPart, cText )
-   //   oStatusBar:SetMsg( cText )
-   //   oMain:SetMsg( cText )
+
+   oStatusBar:SetText( cText )
+   oStatusBar:refresh()
+
+   // when Timeout Message use this
+   oStatusBar:cMsgDef := cText
+
 RETURN
 
 *+--------------------------------------------------------------------
@@ -2670,13 +3423,13 @@ RETURN
 
 *+--------------------------------------------------------------------
 *+
-*+    Function NumColor2RGB()
+*+    Function Num2RGB()
 *+
 *+    Called from ( dualgrid.prg )   2 - static procedure buildmainmenu()
 *+
 *+--------------------------------------------------------------------
 *+
-FUNCTION NumColor2RGB( nColor )
+FUNCTION Num2RGB( nColor )
 
 LOCAL aRetVal
 
@@ -2689,26 +3442,6 @@ LOCAL aRetVal
    ENDIF
 
 RETURN aRetVal
-
-*+--------------------------------------------------------------------
-*+
-*+    Function SysColor2Num()
-*+
-*+--------------------------------------------------------------------
-*+
-FUNCTION SysColor2Num( nColor )
-
-RETURN GetSysColor( nColor )
-
-*+--------------------------------------------------------------------
-*+
-*+    Function RGB2Num()
-*+
-*+--------------------------------------------------------------------
-*+
-FUNCTION RGB2Num( aColor )
-
-RETURN RGB( aColor[ 1 ], aColor[ 2 ], aColor[ 3 ] )
 
 *+--------------------------------------------------------------------
 *+
@@ -2764,9 +3497,6 @@ RETURN nSec
 *+--------------------------------------------------------------------
 *+
 *+    Function CompareFile()
-*+
-*+    Called from ( dualgrid.prg )   2 - class texplorer
-*+                ( tgrid.prg )   2 - class tgrid
 *+
 *+--------------------------------------------------------------------
 *+
@@ -2847,6 +3577,7 @@ RETURN SUBSTR( filename, 1, nPosi - 1 )
 *+
 *+    Called from ( dualgrid.prg )   1 - static procedure viewer()
 *+                                   2 - function comparefile()
+*+                                   1 - function my_directory()
 *+
 *+--------------------------------------------------------------------
 *+
@@ -2883,11 +3614,12 @@ RETURN nPosi
 *+    Function EndwithSlash()
 *+
 *+    Called from ( dualgrid.prg )   2 - procedure main()
+*+                                   1 - static function isfileinpath()
 *+                                   1 - procedure searchrecursive()
-*+                                   7 - class texplorer
+*+                                   8 - class texplorer
 *+                ( iphone.prg )   1 - procedure iphonewin()
 *+                                   1 - static procedure gettargetfolder()
-*+                ( tgrid.prg )   1 - class tgrid
+*+                ( tgrid.prg )   2 - class tgrid
 *+
 *+--------------------------------------------------------------------
 *+
@@ -2910,7 +3642,8 @@ RETURN cString
 *+
 *+    Function AtInside()
 *+
-*+    Called from ( dualgrid.prg )   2 - class texplorer
+*+    Called from ( dualgrid.prg )   1 - static function isfileinpath()
+*+                                   2 - class texplorer
 *+
 *+--------------------------------------------------------------------
 *+
@@ -2949,6 +3682,72 @@ RETURN { @acItem, @acBitmaps, @acType, @nFirstUSB }
 
 *+--------------------------------------------------------------------
 *+
+*+    Function My_Directory()
+*+
+*+    Called from ( dualgrid.prg )   2 - procedure main()
+*+                                   3 - class texplorer
+*+                ( everyth.prg )   2 - function recudirs()
+*+                ( iphone.prg )   1 - procedure iphonewin()
+*+                ( tgrid.prg )   2 - class tgrid
+*+
+*+--------------------------------------------------------------------
+*+
+FUNCTION My_Directory( cDirectory, cAttribute, aDelFile, oObj )
+
+LOCAL aRet    := {}
+LOCAL aDir    := {}
+LOCAL i, iMax
+LOCAL cString
+LOCAL cName   := ""
+LOCAL cExt    := ""
+
+   DEFAULT cAttribute := ""
+   DEFAULT aDelFile := {}
+
+   aDir := DIRECTORY( cDirectory, cAttribute )
+
+   // why does Xbase++ give me "N" for "No Attribut" ?
+   //
+   //    AEVAL( aDir, { | x, i | IF( x[ F_ATTR ] == "N", ;
+   //                   x[ F_ATTR ] := " ", ;
+   //                   NIL ) } )
+
+   iMax := LEN( aDir )
+   FOR i := 1 TO iMax
+      cString := aDir[ i ] [ F_NAME ]
+
+      IF ASCAN( aDelFile, { | x | UPPER( x ) = UPPER( cString ) } ) > 0
+         LOOP
+      ENDIF
+
+      IF "D" $ aDir[ i ] [ F_ATTR ]
+         cName := cString
+         cExt := ""
+      ELSE
+         cName := cString
+         cExt := FINDEXT( cString )
+
+         IF EMPTY( TRIM( cName ) )
+            cName := cExt
+            cExt := ""
+         ELSEIF UPPER( TRIM( cName ) ) = "WASLOS"
+            cExt := ""
+         ENDIF
+
+      ENDIF
+
+      AADD( aRet, { cName, ;
+                    cExt, ;
+                    aDir[ i ] [ F_SIZE ], ;
+                    aDir[ i ] [ F_DATE ], ;
+                    aDir[ i ] [ F_TIME ], ;
+                    aDir[ i ] [ F_ATTR ] } )
+   NEXT
+
+RETURN aRet
+
+*+--------------------------------------------------------------------
+*+
 *+    Function VAR2CHAR()
 *+
 *+    Called from ( codepage.prg )   1 - static function comparekeyboard()
@@ -2978,26 +3777,23 @@ LOCAL i
 LOCAL cText  := ""
 LOCAL xValue
 
-   IF lDebug = .T.
-      FOR i := 1 TO iMax - 1
-         cText += Var2Char( PValue( i ) ) + CHR( 9 )
-      NEXT
-      cText += Var2Char( PValue( iMax ) )
+   FOR i := 1 TO iMax - 1
+      cText += Var2Char( PValue( i ) ) + CHR( 9 )
+   NEXT
+   cText += Var2Char( PValue( iMax ) )
 
-      IF EMPTY( cText )
-         cText := TIME() + " no Parameter ? " + CRLF + PROCNAME( 1 ) + STR( PROCLINE( 1 ) ) + CRLF + PROCNAME( 2 ) + STR( PROCLINE( 2 ) )
-      ENDIF
-
-      SET CONSOLE OFF
-      SET ALTER ON
-
-      // ? cText
-      QOUT( cText )
-
-      SET ALTER OFF
-      SET CONSOLE ON
-
+   IF EMPTY( cText )
+      cText := TIME() + " no Parameter ? " + CRLF + PROCNAME( 1 ) + STR( PROCLINE( 1 ) ) + CRLF + PROCNAME( 2 ) + STR( PROCLINE( 2 ) )
    ENDIF
+
+   SET CONSOLE OFF
+   SET ALTER ON
+
+   // ? cText
+   QOUT( cText )
+
+   SET ALTER OFF
+   SET CONSOLE ON
 
 RETURN NIL
 
@@ -3012,18 +3808,18 @@ RETURN NIL
 CLASS TExplorer FROM TGrid
 
    DATA oGrid
-   DATA oProgress
    DATA oParent
    DATA aLastFolder INIT {}
    DATA aNextFolder INIT {}
-   DATA lChecked INIT .F.
+   DATA lUseUmage INIT .F.                                            // ren from lChecked
    DATA cActiveFile INIT ""
-   DATA oSayActive
+   // no_more   DATA oSayActive
    DATA nStartItem INIT 0
    DATA oVol_Info, oCombo_Info
-   DATA lExHeader INIT .F.
+   DATA lUseCheckBox INIT .F.
 
-   METHOD New( oParent, nTop, nLeft, nWidth, nHeight, cPath, nIcoLarge, nIcoSmall ) CONSTRUCTOR
+   METHOD New( oParent, nTop, nLeft, nWidth, nHeight, cPath, nIcoLarge, nIcoSmall, lCheckbox, lDispInfo ) CONSTRUCTOR
+   METHOD DoCheckState( nItem )
    METHOD DoGetItem( nRow )
    METHOD DoLastFolder( cLastPath )
    METHOD DoNextFolder( cPath )
@@ -3031,7 +3827,8 @@ CLASS TExplorer FROM TGrid
    METHOD FillGrid()
    METHOD DoGetNewTree()
    METHOD DoSayItem( nItem )
-   METHOD BUILDMENU( oCtrl )
+   METHOD BUILDMENU( oCtrl, nRow, nCol, nKeyFlags )
+   METHOD TABmenu( oCtrl, nRow, nCol, nKeyFlags )
    METHOD DoSwitchCheck()
    METHOD ASKFORM( cAction )
    METHOD Start_SHfunc( cAction )
@@ -3042,15 +3839,19 @@ CLASS TExplorer FROM TGrid
    METHOD ShowMoreProperty()
    METHOD DoRunAsAdmin()
    METHOD SendToDeskTop()
+   METHOD SendToClipboard()
    METHOD FindAndCenter( cTitle )
    METHOD RefreshAttr( nRec, cFile, nSize, cDate, cTime, cAttr, lArchive, lReadOnly, lHidden, lSystem )
    METHOD Destroy()
+   METHOD DoCheckBoxItem()
+   METHOD DoMyComBo()
+   METHOD GotoDirectory()
 
-   METHOD Help() INLINE MsgInfo( "F1 Help TExplorer" )                // ::HelpTopic()
+   METHOD HelpTopic() INLINE MsgInfo( "F1 Help DualGrid" )
 
    ENDCLASS
 
-METHOD New( oParent, nTop, nLeft, nWidth, nHeight, cPath, nIcoLarge, nIcoSmall ) CLASS TExplorer
+METHOD New( oParent, nTop, nLeft, nWidth, nHeight, cPath, nIcoLarge, nIcoSmall, lCheckbox, lDispInfo, lUse_Thread ) CLASS TExplorer
 
 LOCAL aPrompts
 LOCAL nClrFore := BFcolor                                             // GetSysColor( COLOR_WINDOWTEXT )
@@ -3061,26 +3862,49 @@ LOCAL cMsg     := ""
 LOCAL bAction  := nil
 LOCAL aHeader  := {}
 LOCAL aDir, nPosi
+LOCAL hVScroll, hHScroll
 
    DEFAULT nIcoLarge := 32
    DEFAULT nIcoSmall := 16
+   DEFAULT lCheckbox := .F.
+   DEFAULT lDispInfo := .F.
+   DEFAULT lUse_Thread := hb_mtvm()
 
    ::oParent := oParent
 
-   AADD( aHeader, { "Name", 200, LVCFMT_LEFT, "C" } )
-   AADD( aHeader, { "Size", 150, LVCFMT_RIGHT, "N" } )
-   AADD( aHeader, { "Date", 110, LVCFMT_RIGHT, "D" } )
-   AADD( aHeader, { "Time", 090, LVCFMT_RIGHT, "C" } )
-   AADD( aHeader, { "Attr", 050, LVCFMT_LEFT, "C" } )
+   AADD( aHeader, { 'Name', 173, LVCFMT_LEFT, "C" } )
+   AADD( aHeader, { 'Ext', 060, LVCFMT_LEFT, "C" } )
+   AADD( aHeader, { 'Size', 110, LVCFMT_RIGHT, "N" } )
+   AADD( aHeader, { 'Date', 110, LVCFMT_RIGHT, "D" } )
+   AADD( aHeader, { 'Time', 090, LVCFMT_RIGHT, "C" } )
+   AADD( aHeader, { 'Attr', 050, LVCFMT_LEFT, "C" } )
 
    ::oGrid := TGrid() :New( nTop, nLeft, aPrompts, bAction, ::oParent, BFcolor, BGcolor, ;
-                      lPixel, lDesign, nWidth, nHeight, cMsg, nIcoLarge, nIcoSmall )
+                      lPixel, lDesign, nWidth, nHeight, cMsg, nIcoLarge, nIcoSmall, lCheckbox, lDispInfo )
 
-   ::oGrid:aHeader := aHeader
+   // you must enable these Option when want to use Ownerdraw / Customdraw
+
+   // use File Icon
+   ::oGrid:lFileIcon := .T.
+   // use Header Click
+   ::oGrid:Use_HeaderClick := .T.
+   // use Ownerdraw Header Icon
+   ::oGrid:Use_oImageLHeader := .T.
+   // use Customdraw Header Color
+   ::oGrid:Use_Customdraw := .T.
+
+   // use Thread if Option -mt is set
+   ::oGrid:lMultiThread := lUse_Thread                                // set := .F. for no Thread
+
+   // search in Path for "MuTool.EXE" to read PDF and made Thumbs
+   ::oGrid:cPathMuTool := IsFileInPath( "mutool.exe" ) // return empty or path
+
    ::oGrid:SortOrder := LVS_SORTASCENDING
+   ::oGrid:aHeader   := aHeader
+   ::oGrid:nColSort  := LV_EXT
 
-   aDir := DIRECTORY( cPath + "*.*", "DHS" )
-   nPosi := ASCAN( aDir, { | x | x[ F_NAME ] = "." .AND. LEN( x[ F_NAME ] ) = 1 } )
+   aDir := My_Directory( cPath + "*.*", "DHS" )
+   nPosi := ASCAN( aDir, { | x | x[ LV_NAME ] = "." .AND. LEN( x[ LV_NAME ] ) = 1 } )
    IF nPosi > 0
       // remove "."
       ADEL( aDir, nPosi )
@@ -3102,6 +3926,7 @@ LOCAL aDir, nPosi
    // Codeblock "right-click"
    ::oGrid:bRbClick := { | oCtrl, nRow, nCol, nKeyFlags | ::BUILDMENU( oCtrl, nRow, nCol, nKeyFlags ) }
 
+   // Mouse "Side-Button" to navigate Backward/Forward
    ::oGrid:bSideBack := { || ::DoLastFolder( TRIM( ::oGrid:cPath ) ) }
    ::oGrid:bSideNext := { || nil }
 
@@ -3110,6 +3935,24 @@ LOCAL aDir, nPosi
       AADD( aHistory, TRIM( ::oGrid:cPath ) )
    ENDIF
 
+   //    hVScroll := ::oGrid:GetScrollbarObj(.T.)
+   //    hHScroll := ::oGrid:GetScrollbarObj(.F.)
+
+RETURN Self
+
+METHOD DoCheckState( nRow ) CLASS TExplorer
+
+LOCAL hGrid  := ::oGrid:hLV
+LOCAL nState := hb_BitOr( LVIS_SELECTED, LVIS_FOCUSED )
+LOCAL nMask  := hb_BitOr( LVIS_SELECTED, LVIS_FOCUSED )
+
+   IF ::oGrid:lCheckBox = .T.
+      IF LV_GETCHECKSTATE( hGrid, nRow ) = .T.
+         DoItemMark( hGrid, nRow, nState, nMask )
+      ELSE
+         DoItemUnMark( hGrid, nRow, 0, nMask )
+      ENDIF
+   ENDIF
 RETURN Self
 
 METHOD BUILDMENU( oCtrl, nRow, nCol, nKeyFlags ) CLASS TExplorer
@@ -3130,11 +3973,18 @@ LOCAL nStackNumber := 0
 #ENDIF
 
    IF BGcolor = Rgb( 0, 0, 1 )
+      //  msginfo("oMenu black")
       MENU oMenu 2013 POPUP ;
               COLORMENU BGcolor, BFcolor ;
               COLORPNEL BFcolor, BGcolor ;
               COLORLEFT BFcolor, BGcolor ;
               COLORSELECT BFcolor, BGcolor, BFcolor
+
+   ELSEIF BGColor = 256 * 256 * 256 - 1                               // 16777215
+      //  msginfo("oMenu white")
+      MENU oMenu 2013 POPUP ;
+              COLORSELECT GetSysColor( COLOR_MENUHILIGHT ), GetSysColor( COLOR_MENUHILIGHT ), GetSysColor( COLOR_MENU )
+
    ELSE
       MENU oMenu 2013 POPUP ;
               COLORMENU BGcolor, BFcolor ;
@@ -3150,22 +4000,32 @@ LOCAL nStackNumber := 0
       MENUITEM "&close TAB" RESNAME "MYCLOSETAB" ACTION DelThisTab()
    ENDIF
    SEPARATOR
-   MENUITEM "&ICON     " RESNAME "VIEWICON" ACTION ::oGrid:SetViewStyle( LVS_ICON, ::lExHeader )
-   MENUITEM "&SMALLICON" RESNAME "VIEWSMALL" ACTION ::oGrid:SetViewStyle( LVS_SMALLICON, ::lExHeader )
-   MENUITEM "&LIST     " RESNAME "VIEWLIST" ACTION ::oGrid:SetViewStyle( LVS_LIST, ::lExHeader )
-   MENUITEM "&REPORT   " RESNAME "VIEWREPORT" ACTION ::oGrid:SetViewStyle( LVS_REPORT, ::lExHeader )
+   MENUITEM "&ICON     " RESNAME "VIEWICON" ACTION ::oGrid:SetViewStyle( LVS_ICON )
+   MENUITEM "&SMALLICON" RESNAME "VIEWSMALL" ACTION ::oGrid:SetViewStyle( LVS_SMALLICON )
+   MENUITEM "&LIST     " RESNAME "VIEWLIST" ACTION ::oGrid:SetViewStyle( LVS_LIST )
+   MENUITEM "&REPORT   " RESNAME "VIEWREPORT" ACTION ::oGrid:SetViewStyle( LVS_REPORT )
    SEPARATOR
-   IF ::lChecked
+   IF ::lUseCheckBox
+      MENUITEM "Check&box OFF" RESNAME "MYCHECKON" ACTION ::DoCheckBoxItem()
+   ELSE
+      MENUITEM "Check&box ON" RESNAME "MYCHECKOFF" ACTION ::DoCheckBoxItem()
+   ENDIF
+   SEPARATOR
+   IF ::lUseUmage
       MENUITEM "use &Image" RESNAME "MYCHECKIT" ACTION ::DoSwitchCheck()
    ELSE
       MENUITEM "use &Image" ACTION ::DoSwitchCheck()
    ENDIF
    SEPARATOR
-   MENUITEM "Tree" RESNAME "VIEWTREE" ACTION ::DoGetNewTree()
+   MENUITEM "&Tree" RESNAME "VIEWTREE" ACTION ::DoGetNewTree()
    SEPARATOR
    MENUITEM "send to &Desktop" RESNAME "MYDESKTOP" ACTION ::SendToDeskTop()
    SEPARATOR
-   MENUITEM "compare Folder" RESNAME "MYCOMPARE" ACTION CompareDir()
+   MENUITEM "Filename to &Clipboard" RESNAME "MYEMPTYCLIP" ACTION ::SendToClipboard()
+   SEPARATOR
+   MENUITEM "&v goto from Clipboard" RESNAME "MYCLIPBOARD" ACTION ::GotoDirectory()
+   SEPARATOR
+   MENUITEM "c&ompare Folder" RESNAME "MYCOMPARE" ACTION CompareDir()
    SEPARATOR
    MENUITEM "run &as Admin" RESNAME "MYADMIN" ACTION ::DoRunAsAdmin()
    SEPARATOR
@@ -3178,6 +4038,87 @@ LOCAL nStackNumber := 0
 
    ACTIVATE POPUP oMenu OF oCtrl AT nRow, nCol
 RETURN oMenu
+
+METHOD TABmenu( oCtrl, nRow, nCol, nKeyFlags )
+
+LOCAL oMenu, oFont
+LOCAL nStackNumber := 0
+
+   IF nGridFocus = 1
+      nStackNumber := LEN( Stack_Left )
+   ELSE
+      nStackNumber := LEN( Stack_Right )
+   ENDIF
+
+   DEFINE FONT oFont NAME "TAHOMA" SIZE 0, - nFontBig
+      ACTIVATE FONT oFont
+#IFDEF __HMG__
+   END FONT
+#ENDIF
+
+   IF BGcolor = Rgb( 0, 0, 1 )
+      //  msginfo("oMenu black")
+      MENU oMenu 2013 POPUP ;
+              COLORMENU BGcolor, BFcolor ;
+              COLORPNEL BFcolor, BGcolor ;
+              COLORLEFT BFcolor, BGcolor ;
+              COLORSELECT BFcolor, BGcolor, BFcolor
+
+   ELSEIF BGColor = 256 * 256 * 256 - 1                               // 16777215
+      //  msginfo("oMenu white")
+      MENU oMenu 2013 POPUP ;
+              COLORSELECT GetSysColor( COLOR_MENUHILIGHT ), GetSysColor( COLOR_MENUHILIGHT ), GetSysColor( COLOR_MENU )
+
+   ELSE
+      MENU oMenu 2013 POPUP ;
+              COLORMENU BGcolor, BFcolor ;
+              COLORPNEL BFcolor, BGcolor ;
+              COLORLEFT BFcolor, BGcolor ;
+              COLORSELECT BFcolor, BFcolor, BGcolor
+   ENDIF
+
+   oMenu:oFont := oFont
+
+   MENUITEM "&add TAB" + CHR( 9 ) + "CTRL+T" RESNAME "MYADDTAB" ACTION NewTab()
+   IF nStackNumber > 1
+      MENUITEM "&close TAB" RESNAME "MYCLOSETAB" ACTION DelThisTab()
+   ENDIF
+
+   ENDMENU
+
+   ACTIVATE POPUP oMenu OF oCtrl AT nRow, nCol
+RETURN oMenu
+
+METHOD GotoDirectory() CLASS TExplorer
+
+LOCAL cText := ""
+LOCAL cPath := ""
+LOCAL cFile := ""
+LOCAL nPosi
+
+   cText := TextFromClipboard()
+   IF !EMPTY( cText )
+      IF FILE( cText )
+         nPosi := RAT( "\", cText )
+         IF nPosi > 0
+            cPath := SUBSTR( cText, 1, nPosi )
+            cFile := SUBSTR( cText, nPosi + 1 )
+            GoHistory( cPath )
+            nPosi := ASCAN( ::oGrid:aSource, { | x | UPPER( x[ LV_NAME ] ) = UPPER( cFile ) } )
+
+            IF nPosi > 0
+               //  do while ::oGrid:lThreadActive = .T.
+               //     hb_IdleSleep( 0.1 )
+               //     SysRefresh()
+               //  enddo
+               ::oGrid:lRePosition := .F.
+               LV_SETITEMSELECT( ::oGrid:hLv, nPosi )
+            ENDIF
+         ENDIF
+      ENDIF
+   ENDIF
+
+RETURN nil
 
 METHOD Destroy() CLASS TExplorer
 
@@ -3193,7 +4134,7 @@ LOCAL cTitle    := "search Folder"
 LOCAL cInitPath := ::oGrid:cPath
 LOCAL cDir, oTimer
 
-   DEFINE TIMER oTimer INTERVAL 200 ACTION( ::FindAndCenter( cTitle ), oTimer:End() )
+   DEFINE TIMER oTimer INTERVAL 500 ACTION( { || ::FindAndCenter( cTitle, oTimer ) } )
    ACTIVATE TIMER oTimer
 
    cDir := CGETDIR( cTitle, TRIM( cInitPath ) )
@@ -3209,7 +4150,7 @@ LOCAL cDir, oTimer
    ENDIF
 RETURN nil
 
-METHOD FindAndCenter( cTitle ) CLASS TExplorer
+METHOD FindAndCenter( cTitle, oTimer ) CLASS TExplorer
 
 LOCAL nCount  := 0
 LOCAL hWndDlg := 0
@@ -3223,7 +4164,7 @@ LOCAL nHeight
    DO WHILE hWndDlg = 0
       hWndDlg := FindWindowEx(,,, cTitle )
       IF !( hWndDlg == 0 )
-         MoveWindow( hWndDlg, ( nHeight - 1024 ) / 2, ( nWidth - 300 ) / 2, 300, 1024 )
+         MoveWindow( hWndDlg, 0, ( nWidth - 300 ) / 2, 300, nHeight / 4 * 2 )
          INVALIDATERECT( hWndDlg )
          EXIT
       ENDIF
@@ -3234,45 +4175,44 @@ LOCAL nHeight
       ENDIF
    ENDDO
 
+   oTimer:end()
+
 RETURN nil
 
 METHOD DoSayItem( nRow ) CLASS TExplorer
 
 LOCAL cRet  := ""
 LOCAL hWnd  := ::oGrid:hWnd
-LOCAL nCol  := 1                                                      // only F_NAME
+LOCAL nCol  := 1                                                      // only LV_NAME
 LOCAL cPath := ::oGrid:cPath
 
    cRet := LV_GETITEMTEXT( hWnd, nRow, nCol )
 
    ::cActiveFile := cPath + cRet
-   ::oSayActive:SetText( ::cActiveFile )
 
-   // how does Statusbar work ?
-   //
-   ::oGrid:cMsg := cPath + cRet
+   // no_more   ::oSayActive:SetText( ::cActiveFile )
+   SayBar( cPath + cRet )
 
 RETURN cRet
 
 METHOD DoGetItem( nRow ) CLASS TExplorer
 
 LOCAL cRet    := ""
-LOCAL nCol    := 1                                                    // only F_NAME
+LOCAL nCol    := 1                                                    // only LV_NAME
 LOCAL hWnd    := ::oGrid:hWnd
 LOCAL cPath   := ::oGrid:cPath
 LOCAL aSource := ::oGrid:aSource
 LOCAL nPosi, cAttr
 
-   // when using LVN_GETDISPINFO you NEED Source Array
    IF ::oGrid:lDispInfo = .T.
       cRet := ::oGrid:aSource[ nRow ] [ nCol ]
    ELSE
       cRet := LV_GETITEMTEXT( hWnd, nRow, nCol )
    ENDIF
 
-   nPosi := ASCAN( aSource, { | x | x[ F_NAME ] = TRIM( cRet ) } )
+   nPosi := ASCAN( aSource, { | x | x[ LV_NAME ] = TRIM( cRet ) } )
    IF nPosi > 0
-      cAttr := aSource[ nPosi ] [ F_ATTR ]
+      cAttr := aSource[ nPosi ] [ LV_ATTR ]
 
       DO CASE
          CASE TRIM( cRet ) = ".."
@@ -3299,6 +4239,9 @@ LOCAL cFolder
 
    nPosi := hb_RAt( "\", cLastPath, 1, LEN( cLastPath ) - 1 )
    IF nPosi > 0
+
+      // if still loading Data : Break it
+      ::oGrid:lBreakFOR := .T.
 
       cPath := SUBSTR( cLastPath, 1, nPosi - 1 )
       cFolder := SUBSTR( cLastPath, nPosi )
@@ -3327,13 +4270,16 @@ LOCAL aDir, aToken, nPosi, nMax, nDim, oTab, aPrompts
       oTab := oTab_Right
    ENDIF
 
-   aDir := DIRECTORY( cPath + "\*.*", "DHS" )
-   nPosi := ASCAN( aDir, { | x | x[ F_NAME ] = "." .AND. LEN( x[ F_NAME ] ) = 1 } )
+   aDir := My_Directory( cPath + "\*.*", "DHS" )
+   nPosi := ASCAN( aDir, { | x | x[ LV_NAME ] = "." .AND. LEN( x[ LV_NAME ] ) = 1 } )
    IF nPosi > 0
       // remove "."
       ADEL( aDir, nPosi )
       ASIZE( aDir, LEN( aDir ) - 1 )
    ENDIF
+
+   // if still loading Data : Break it
+   ::oGrid:lBreakFOR := .T.
 
    ::oGrid:cPath := EndwithSlash( cPath )
    ::oGrid:aSource := aDir
@@ -3351,26 +4297,33 @@ LOCAL aDir, aToken, nPosi, nMax, nDim, oTab, aPrompts
 
    ::FillGrid()
 
-   nMax := LEN( ::aSource )
-   // need for LVS_OWNERDATA / ::OnDISPINFO()
-   LV_SETITEMCOUNT( ::oGrid:hLv, nMax )
-
+   ::oGrid:nLastPos := 0
    IF !EMPTY( cFolder )
-      nPosi := ASCAN( ::oGrid:aSource, { | e | LOWER( e[ F_NAME ] ) = LOWER( cFolder ) } )
+      nPosi := ASCAN( ::oGrid:aSource, { | e | LOWER( e[ LV_NAME ] ) = LOWER( cFolder ) } )
       IF nPosi > 0
          LV_SETITEMSELECT( ::oGrid:hLv, nPosi )
+         ::oGrid:nLastPos := nPosi
       ELSE
          msginfo( "not found Folder " + cFolder )
       ENDIF
+   ELSE
+      LV_SETITEMSELECT( ::oGrid:hLv, 1 )
    ENDIF
 
    aToken := AtInside( "\", ::oGrid:cPath )
-   aPrompts := ACLONE( oTab:aPrompts )
-   // change Header of TAB
-   aPrompts[ nDim ] := UPPER( aToken[ LEN( aToken ) - 1 ] )
-   // set new aPrompts
-   oTab:SetPrompts( aPrompts )
+   IF lUse_TFolderEx = .F.
+      aPrompts := ACLONE( oTab:aPrompts )
+      // change Header of TAB
+      aPrompts[ nDim ] := UPPER( aToken[ LEN( aToken ) - 1 ] )
+      // set new aPrompts
+      oTab:SetPrompts( aPrompts )
+   ELSE
+      oTab:cVarName := UPPER( aToken[ LEN( aToken ) - 1 ] )
+      oTab:aPrompts[ oTab:nOption ] := UPPER( aToken[ LEN( aToken ) - 1 ] )
+      oTab:Default()
 
+      oTab:Refresh()
+   ENDIF
    ::oGrid:Setfocus()
 
 RETURN cRet
@@ -3381,13 +4334,13 @@ METHOD SetStyle( nView ) CLASS TExplorer
 
    DO CASE
       CASE nView = LVS_ICON
-         ::oGrid:SetViewStyle( LVS_ICON, ::lExHeader )
+         ::oGrid:SetViewStyle( LVS_ICON )
       CASE nView = LVS_SMALLICON
-         ::oGrid:SetViewStyle( LVS_SMALLICON, ::lExHeader )
+         ::oGrid:SetViewStyle( LVS_SMALLICON )
       CASE nView = LVS_LIST
-         ::oGrid:SetViewStyle( LVS_LIST, ::lExHeader )
+         ::oGrid:SetViewStyle( LVS_LIST )
       CASE nView = LVS_REPORT
-         ::oGrid:SetViewStyle( LVS_REPORT, ::lExHeader )
+         ::oGrid:SetViewStyle( LVS_REPORT )
    ENDCASE
 RETURN self
 
@@ -3395,117 +4348,70 @@ METHOD FillGrid( nCol, oDlg ) CLASS TExplorer
 
 LOCAL nStartAt := 1
 LOCAL hGrid    := ::oGrid:hLv
-LOCAL hBmpA    := LoadBitmap( GetResources(), "GRID_ASC" )
-LOCAL hBmpD    := LoadBitmap( GetResources(), "GRID_DSC" )
-LOCAL aToken, nDim, oTab, aPrompts, cPath
+LOCAL aToken, nDim, oTab, aPrompts, cPath, nMax
 LOCAL nWidth, cCaption, nAlign := HDF_LEFT
 
-   DEFAULT nCol := F_NAME
+   DEFAULT nCol := LV_NAME
 
    IF nGridFocus = 1
-      nDim := nDimLeft
-      oTab := oTab_Left
+      nDim  := nDimLeft
+      oTab  := oTab_Left
       cPath := cPath_Left
    ELSE
-      nDim := nDimRight
-      oTab := oTab_Right
+      nDim  := nDimRight
+      oTab  := oTab_Right
       cPath := cPath_Right
    ENDIF
 
    IF !EMPTY( oDlg )                                                  // lNewName = .T.
       aToken := AtInside( "\", cPath )
-      aPrompts := ACLONE( oTab:aPrompts )
-      aPrompts[ nDim ] := UPPER( aToken[ LEN( aToken ) - 1 ] )
-      oTab:SetPrompts( aPrompts )
+      IF lUse_TFolderEx = .F.
+         aPrompts := ACLONE( oTab:aPrompts )
+         aPrompts[ nDim ] := UPPER( aToken[ LEN( aToken ) - 1 ] )
+         oTab:SetPrompts( aPrompts )
+      ELSE
+         oTab:cVarName := UPPER( aToken[ LEN( aToken ) - 1 ] )
+         oTab:aPrompts[ oTab:nOption ] := UPPER( aToken[ LEN( aToken ) - 1 ] )
+
+         oTab:Default()
+         oTab:Refresh()
+      ENDIF
    ENDIF
 
-   ASORT( ::oGrid:aSource,,, { | x, y | "D" $ x[ F_ATTR ] } )
-   AEVAL( ::oGrid:aSource, { | x, i | nStartAt := IF( "D" $ x[ F_ATTR ], i, nStartAt ) } )
-   // ASORT(::oGrid:aSource,1,nStartAt,{|x,y|  LOWER(x[F_NAME]) < LOWER(y[F_NAME]) })
-   ASORT( ::oGrid:aSource, 1, nStartAt, { | x, y | UPPER( x[ F_NAME ] ) < UPPER( y[ F_NAME ] ) } )
+   ::oGrid:SetGridHeaderSort( ::oGrid:nColSort,, .F. )
 
-   DO CASE
-      CASE nCol = F_NAME
-         IF ::oGrid:SortOrder = LVS_SORTASCENDING
-            // ASORT( ::oGrid:aSource, nStartAt + 1,, { | x, y | ( x[ F_NAME ], y[ F_NAME ], .T. ) } )
-            ASORT( ::oGrid:aSource, nStartAt + 1,, { | x, y | CompareFile( x[ F_NAME ], y[ F_NAME ], .T. ) } )
-            //             SetGridHeaderSort( hGrid, 1, + 1 )
-            ::oGrid:SetHeaderItem( nCol, cCaption, nWidth, nAlign, + 1, hBmpA )
-
-         ELSE
-            // ASORT( ::oGrid:aSource, nStartAt + 1,, { | x, y | ( x[ F_NAME ], y[ F_NAME ], .F. ) } )
-            ASORT( ::oGrid:aSource, nStartAt + 1,, { | x, y | CompareFile( x[ F_NAME ], y[ F_NAME ], .F. ) } )
-            //             SetGridHeaderSort( hGrid, 1, - 1 )
-            ::oGrid:SetHeaderItem( nCol, cCaption, nWidth, nAlign, - 1, hBmpD )
-         ENDIF
-
-      CASE nCol = F_SIZE
-         IF ::oGrid:SortOrder = LVS_SORTASCENDING
-            ASORT( ::oGrid:aSource, nStartAt + 1,, { | x, y | ( x[ F_SIZE ] ) < ( y[ F_SIZE ] ) } )
-            //             SetGridHeaderSort( hGrid, 2, + 1 )
-            ::oGrid:SetHeaderItem( nCol, cCaption, nWidth, nAlign, + 1, hBmpA )
-         ELSE
-            ASORT( ::oGrid:aSource, nStartAt + 1,, { | x, y | ( x[ F_SIZE ] ) > ( y[ F_SIZE ] ) } )
-            //             SetGridHeaderSort( hGrid, 2, - 1 )
-            ::oGrid:SetHeaderItem( nCol, cCaption, nWidth, nAlign, - 1, hBmpD )
-         ENDIF
-
-      CASE nCol = F_DATE
-         IF ::oGrid:SortOrder = LVS_SORTASCENDING
-            ASORT( ::oGrid:aSource, nStartAt + 1,, { | x, y | ( x[ F_DATE ] ) < ( y[ F_DATE ] .AND. ( x[ F_TIME ] ) < ( y[ F_TIME ] ) ) } )
-            //             SetGridHeaderSort( hGrid, 3, + 1 )
-            ::oGrid:SetHeaderItem( nCol, cCaption, nWidth, nAlign, + 1, hBmpA )
-         ELSE
-            ASORT( ::oGrid:aSource, nStartAt + 1,, { | x, y | ( x[ F_DATE ] ) > ( y[ F_DATE ] .AND. ( x[ F_TIME ] ) > ( y[ F_TIME ] ) ) } )
-            //             SetGridHeaderSort( hGrid, 3, - 1 )
-            ::oGrid:SetHeaderItem( nCol, cCaption, nWidth, nAlign, - 1, hBmpD )
-         ENDIF
-
-      CASE nCol = F_TIME
-         IF ::oGrid:SortOrder = LVS_SORTASCENDING
-            ASORT( ::oGrid:aSource, nStartAt + 1,, { | x, y | ( x[ F_TIME ] ) < ( y[ F_TIME ] ) } )
-            //             SetGridHeaderSort( hGrid, 4, + 1 )
-            ::oGrid:SetHeaderItem( nCol, cCaption, nWidth, nAlign, + 1, hBmpA )
-         ELSE
-            ASORT( ::oGrid:aSource, nStartAt + 1,, { | x, y | ( x[ F_TIME ] ) > ( y[ F_TIME ] ) } )
-            //             SetGridHeaderSort( hGrid, 4, - 1 )
-            ::oGrid:SetHeaderItem( nCol, cCaption, nWidth, nAlign, - 1, hBmpD )
-         ENDIF
-
-      CASE nCol = F_ATTR
-         IF ::oGrid:SortOrder = LVS_SORTASCENDING
-            ASORT( ::oGrid:aSource, nStartAt + 1,, { | x, y | ( x[ F_ATTR ] ) < ( y[ F_ATTR ] ) } )
-            //             SetGridHeaderSort( hGrid, 5, + 1 )
-            ::oGrid:SetHeaderItem( nCol, cCaption, nWidth, nAlign, + 1, hBmpA )
-         ELSE
-            ASORT( ::oGrid:aSource, nStartAt + 1,, { | x, y | ( x[ F_ATTR ] ) > ( y[ F_ATTR ] ) } )
-            //             SetGridHeaderSort( hGrid, 5, - 1 )
-            ::oGrid:SetHeaderItem( nCol, cCaption, nWidth, nAlign, - 1, hBmpD )
-         ENDIF
-
-   ENDCASE
-
-   DeleteObject( hBmpA )
-   DeleteObject( hBmpD )
-
-   // IF ::oGrid:SortOrder = LVS_SORTASCENDING
-   //    ::oGrid:SortOrder := LVS_SORTDESCENDING
-   // ELSE
-   //    ::oGrid:SortOrder := LVS_SORTASCENDING
-   // ENDIF
-
-   ::oGrid:ClearAndFillDir( oDlg )
+   IF ::oGrid:lDispInfo = .T.
+      nMax := LEN( ::oGrid:aSource )
+      // need for LVS_OWNERDATA / ::OnDISPINFO()
+      LV_SETITEMCOUNT( ::oGrid:hLv, nMax )
+      ::oGrid:refreshall()
+   ELSE
+      ::oGrid:ClearAndFillDir( oDlg )
+   ENDIF
 
 RETURN self
 
 METHOD DoSwitchCheck() CLASS TExplorer
 
-   IF ::lChecked
+   IF ::lUseUmage = .T.
       ::oGrid:lImage := .F.
    ELSE
       ::oGrid:lImage := .T.
    ENDIF
-   ::lChecked := !::lChecked
+   ::lUseUmage := !::lUseUmage
+
+RETURN nil
+
+METHOD DoCheckBoxItem() CLASS TExplorer
+
+   IF ::lUseCheckBox = .T.
+      ::oGrid:lCheckBox := .F.
+   ELSE
+      ::oGrid:lCheckBox := .T.
+   ENDIF
+   ::lUseCheckBox := !::lUseCheckBox
+
+   ::oGrid:SetViewStyle( ::oGrid:nview )
 
 RETURN nil
 
@@ -3513,7 +4419,7 @@ METHOD ASKFORM( cAction ) CLASS TExplorer
 
 LOCAL oASKFORM, oText_1, oText_2, oLabel_1, oLabel_2, oSourceInfo     //, oTimer
 LOCAL olConfirm, olPaperbin, oButton_Start, oButton_Tree, oButton_Abort
-LOCAL iMax, nPosi
+LOCAL iMax, nPosi, oSelf
 LOCAL cSourceDir := IF( nGridFocus = 1, cPath_Left, cPath_Right )
 LOCAL cTargetDir := IF( nGridFocus = 1, cPath_Right, cPath_Left )
 LOCAL aItem      := ::oGrid:Getdata()
@@ -3544,10 +4450,10 @@ LOCAL lRet       := .F.
 
    DEFINE WINDOW oASKFORM FROM 0, 0 TO 270, 534 PIXEL TITLE cAction ICON "A1MAIN" COLOR BFcolor, BGcolor NOMINIMIZE NOMAXIMIZE
 
-      @ 010, 080 SAY oSourceInfo PROMPT cFile SIZE 400, 30 PIXEL FONT oFontDefault OF oASKFORM         
+      @ 010, 080 SAY oSourceInfo PROMPT cFile SIZE 400, 30 PIXEL FONT oFontDefault OF oASKFORM
 
-      @ 010, 010 SAY oLabel_1 PROMPT "Source" SIZE 60, 30 PIXEL FONT oFontDefault OF oASKFORM         
-      @ 040, 010 GET oText_1 VAR cSourceDir SIZE 500, 30 PIXEL FONT oFontDefault OF oASKFORM          
+      @ 010, 010 SAY oLabel_1 PROMPT "Source" SIZE 60, 30 PIXEL FONT oFontDefault OF oASKFORM
+      @ 040, 010 GET oText_1 VAR cSourceDir SIZE 500, 30 PIXEL FONT oFontDefault OF oASKFORM
 
       @ 080, 210 CHECKBOX olConfirm VAR lConfirm PROMPT "want &Confirm" SIZE 200, 24 PIXEL FONT oFontDefault OF oASKFORM
       @ 080, 210 CHECKBOX olPaperbin VAR lPaperbin PROMPT "to &Paperbin" SIZE 200, 24 PIXEL FONT oFontDefault OF oASKFORM
@@ -3555,12 +4461,33 @@ LOCAL lRet       := .F.
       SetWindowTheme( olConfirm :hWnd, "", "" )
       SetWindowTheme( olPaperbin:hWnd, "", "" )
 
-      @ 080, 010 SAY oLabel_2 PROMPT "Target" SIZE 60, 30 PIXEL FONT oFontDefault OF oASKFORM         
-      @ 110, 010 GET oText_2 VAR cTargetDir SIZE 500, 30 PIXEL FONT oFontDefault OF oASKFORM          
+      @ 080, 010 SAY oLabel_2 PROMPT "Target" SIZE 60, 30 PIXEL FONT oFontDefault OF oASKFORM
+      @ 110, 010 GET oText_2 VAR cTargetDir SIZE 500, 30 PIXEL FONT oFontDefault OF oASKFORM
 
-      @ 150, 010 BUTTON oButton_Start PROMPT "&OK" SIZE 100, 64 PIXEL FONT oFontDefault ACTION ::Start_SHfunc( aItem, cAction, cSourceDir, cTargetDir, lConfirm, lPaperbin, oASKFORM ) OF oASKFORM
-      @ 150, 210 BUTTON oButton_Tree PROMPT "&Tree" SIZE 100, 64 PIXEL FONT oFontDefault ACTION ::GetNewDir( oText_2 ) OF oASKFORM
-      @ 150, 410 BUTTON oButton_Abort PROMPT "&Abort" SIZE 100, 64 PIXEL FONT oFontDefault ACTION oASKFORM:End() OF oASKFORM
+      IF lUse_BTNBMP = .T.
+
+         oSelf := SELF
+
+         @ 150, 010 BTNBMP oButton_Start SIZE 100, 64 PIXEL OF oASKFORM UPDATE ;
+                 PROMPT "&OK" CENTER ;
+                 ACTION( oSelf:Start_SHfunc( aItem, cAction, cSourceDir, cTargetDir, lConfirm, lPaperbin, oASKFORM, nGridFocus ) ) FONT oFontDefault COLOR BFcolor, BGcolor
+         oButton_Start:bClrGrad := bGradient
+
+         @ 150, 210 BTNBMP oButton_Tree SIZE 100, 64 PIXEL OF oASKFORM UPDATE ;
+                 PROMPT "&Tree" CENTER ;
+                 ACTION( oSelf:GetNewDir( oText_2 ) ) FONT oFontDefault COLOR BFcolor, BGcolor
+         oButton_Tree:bClrGrad := bGradient
+
+         @ 150, 410 BTNBMP oButton_Abort SIZE 100, 64 PIXEL OF oASKFORM UPDATE ;
+                 PROMPT "&Abort" CENTER ;
+                 ACTION( oASKFORM:End() ) FONT oFontDefault COLOR BFcolor, BGcolor
+         oButton_Abort:bClrGrad := bGradient
+      ELSE
+
+         @ 150, 010 BUTTON oButton_Start PROMPT "&OK" SIZE 100, 64 PIXEL FONT oFontDefault ACTION ::Start_SHfunc( aItem, cAction, cSourceDir, cTargetDir, lConfirm, lPaperbin, oASKFORM, nGridFocus ) OF oASKFORM
+         @ 150, 210 BUTTON oButton_Tree  PROMPT "&Tree" SIZE 100, 64 PIXEL FONT oFontDefault ACTION ::GetNewDir( oText_2 ) OF oASKFORM
+         @ 150, 410 BUTTON oButton_Abort PROMPT "&Abort" SIZE 100, 64 PIXEL FONT oFontDefault ACTION oASKFORM:End() OF oASKFORM
+      ENDIF
 
 #IFDEF __HMG__
    END WINDOW
@@ -3588,7 +4515,7 @@ LOCAL lRet       := .F.
    ENDIF
 RETURN Nil
 
-METHOD Start_SHfunc( aItem, cAction, cSourceDir, cTargetDir, lConfirm, lPaperbin, oASKFORM ) CLASS TExplorer
+METHOD Start_SHfunc( aItem, cAction, cSourceDir, cTargetDir, lConfirm, lPaperbin, oASKFORM, nSourceSide ) CLASS TExplorer
 
 LOCAL lRet     := .F.
 LOCAL acDelete := {}
@@ -3615,11 +4542,11 @@ LOCAL cFile, nSize, dDate, cTime, cAttr
          ::nStartItem := nPosi
       ENDIF
 
-      cFile := ::oGrid:aSource[ nPosi ] [ F_NAME ]
-      nSize := ::oGrid:aSource[ nPosi ] [ F_SIZE ]
-      dDate := ::oGrid:aSource[ nPosi ] [ F_DATE ]
-      cTime := ::oGrid:aSource[ nPosi ] [ F_TIME ]
-      cAttr := ::oGrid:aSource[ nPosi ] [ F_ATTR ]
+      cFile := ::oGrid:aSource[ nPosi ] [ LV_NAME ]
+      nSize := ::oGrid:aSource[ nPosi ] [ LV_SIZE ]
+      dDate := ::oGrid:aSource[ nPosi ] [ LV_DATE ]
+      cTime := ::oGrid:aSource[ nPosi ] [ LV_TIME ]
+      cAttr := ::oGrid:aSource[ nPosi ] [ LV_ATTR ]
 
       AADD( acFiles, cSourceDir + cFile )
       IF cAction = "DELETE"
@@ -3631,7 +4558,7 @@ LOCAL cFile, nSize, dDate, cTime, cAttr
 
    NEXT
 
-   lRet := DoSH3func( cAction, lConfirm, lPaperbin, acFiles, acTarget )
+   lRet := DoSH3func( cAction, lConfirm, lPaperbin, acFiles, acTarget, nSourceSide )
 
    LV_SETITEMSELECT( ::oGrid:hLv, ::nStartItem )
 
@@ -3691,15 +4618,15 @@ LOCAL oWnd, aItem, iMax, nItem
 LOCAL lArchive, lReadOnly, lHidden, lSystem
 LOCAL cDate, cTime, aDir, nSize, cAttr
 LOCAL cPath, cName, cFile, lChange := .f.
-LOCAL aSource, nRec := 1
 LOCAL oFA_Check_1, oFA_Check_2, oFA_Check_3, oFA_Check_4, oFA_Check_5
 LOCAL oFA_Button_1, oFA_Button_2, oFA_Button_3
 LOCAL oFA_Text_1, oFA_Text_2, oFA_Text_3
-LOCAL cSourceDir   := ::oGrid:cPath
+LOCAL aSource, nRec := 1
+LOCAL cSourceDir    := ::oGrid:cPath
 
    aSource := ::oGrid:aSource
-   aItem := ::oGrid:Getdata()
-   cPath := EndwithSlash( ::oGrid:cPath )
+   aItem   := ::oGrid:Getdata()
+   cPath   := EndwithSlash( ::oGrid:cPath )
 
    IF EMPTY( aItem )
       Msginfo( "no Item ?" )
@@ -3712,32 +4639,33 @@ LOCAL cSourceDir   := ::oGrid:cPath
                Msginfo( "can't use '..'" )
                RETURN Nil
             ENDIF
-            cFile := aSource[ aItem[ 1 ] ] [ F_NAME ]
+            cFile := aSource[ aItem[ 1 ] ] [ LV_NAME ]
          ELSE
             Msginfo( "multi select not allowed" )
             RETURN Nil
          ENDIF
       ELSEIF VALTYPE( aItem ) = "C"
-         cFile := aSource[ aItem[ 1 ] ] [ F_NAME ]
+         cFile := aSource[ aItem[ 1 ] ] [ LV_NAME ]
       ENDIF
    ENDIF
    nRec := aItem[ 1 ]
 
-   aDir := DIRECTORY( cPath + cFile )
+   aDir := My_Directory( cPath + cFile )
    IF EMPTY( aDir )
       Msginfo( "no " + cPath + cFile )
       RETURN nil
    ENDIF
 
-   cDate := DTOC( aDir[ 1 ] [ F_DATE ] )
-   cTime := aDir[ 1 ] [ F_TIME ]
-   cAttr := aDir[ 1 ] [ F_ATTR ]
-   lArchive := "A" $ aDir[ 1 ] [ F_ATTR ]
-   lReadOnly := "R" $ aDir[ 1 ] [ F_ATTR ]
-   lHidden := "H" $ aDir[ 1 ] [ F_ATTR ]
-   lSystem := "S" $ aDir[ 1 ] [ F_ATTR ]
+   cDate := DTOC( aDir[ 1 ] [ LV_DATE ] )
+   cTime := aDir[ 1 ] [ LV_TIME ]
+   cAttr := aDir[ 1 ] [ LV_ATTR ]
 
-   nSize := aDir[ 1 ] [ F_SIZE ]
+   lReadOnly := "R" $ aDir[ 1 ] [ LV_ATTR ]
+   lArchive  := "A" $ aDir[ 1 ] [ LV_ATTR ]
+   lHidden   := "H" $ aDir[ 1 ] [ LV_ATTR ]
+   lSystem   := "S" $ aDir[ 1 ] [ LV_ATTR ]
+
+   nSize := aDir[ 1 ] [ LV_SIZE ]
 
    DEFINE WINDOW oWnd FROM 0, 0 TO 290, 300 PIXEL TITLE "File attributes for " + cFile ICON "A1MAIN" NOMINIMIZE NOMAXIMIZE COLOR BFcolor, BGcolor
 
@@ -3765,8 +4693,8 @@ LOCAL cSourceDir   := ::oGrid:cPath
               cTime := TIME(), oFA_Text_2:refresh(), ;
               lChange := .t., oFA_Check_5:refresh() )
 
-      @ 160, 014 GET oFA_Text_1 VAR cDate SIZE 120, 28 PIXEL FONT oFontDefault COLOR BFcolor, BGcolor OF oWnd        
-      @ 160, 182 GET oFA_Text_2 VAR cTime SIZE 100, 28 PIXEL FONT oFontDefault COLOR BFcolor, BGcolor OF oWnd        
+      @ 160, 014 GET oFA_Text_1 VAR cDate SIZE 120, 28 PIXEL FONT oFontDefault COLOR BFcolor, BGcolor OF oWnd
+      @ 160, 182 GET oFA_Text_2 VAR cTime SIZE 100, 28 PIXEL FONT oFontDefault COLOR BFcolor, BGcolor OF oWnd
 
       @ 202, 014 BUTTON oFA_Button_2 PROMPT "&Cancel" SIZE 80, 42 PIXEL FONT oFontDefault ACTION oWnd:End()
       @ 202, 206 BUTTON oFA_Button_1 PROMPT "&Ok" SIZE 74, 42 PIXEL FONT oFontDefault ACTION( SetAttr( cPath + cFile, lArchive, lReadOnly, lHidden, lSystem, lChange, cDate, cTime ), oWnd:End() )
@@ -3787,30 +4715,33 @@ RETURN Nil
 METHOD RefreshAttr( nRec, cFile, nSize, cDate, cTime, cAttr, lArchive, lReadOnly, lHidden, lSystem ) CLASS TExplorer
 
 LOCAL aItem
+LOCAL cNewAttr := ""
+LOCAL cExt := FINDEXT( cFile )
 
-LOCAL nAttribute := 0
    IF lArchive
-      nAttribute := nOr( nAttribute, FILE_ATTRIBUTE_ARCHIVE )
+      cNewAttr += "A"
    ENDIF
    IF lReadOnly
-      nAttribute := nOr( nAttribute, FILE_ATTRIBUTE_READONLY )
+      cNewAttr += "R"
    ENDIF
    IF lHidden
-      nAttribute := nOr( nAttribute, FILE_ATTRIBUTE_HIDDEN )
+      cNewAttr += "H"
    ENDIF
    IF lSystem
-      nAttribute := nOr( nAttribute, FILE_ATTRIBUTE_SYSTEM )
+      cNewAttr += "S"
    ENDIF
+   aItem := { cFile, TRIM(cExt), vAR2CHAR( nSize ), cDate, cTime, cNewAttr }
 
-   aItem := { cFile, vAR2CHAR( nSize ), cDate, cTime, nAttribute }
-
+   // replace Item in TGrid
    LV_SETITEMTEXT( ::oGrid:hLv, aItem, nRec )
 
-   ::oGrid:aSource[ nRec ] [ F_NAME ] := cFile
-   ::oGrid:aSource[ nRec ] [ F_SIZE ] := vAR2CHAR( nSize )
-   ::oGrid:aSource[ nRec ] [ F_DATE ] := CTOD( cDate )
-   ::oGrid:aSource[ nRec ] [ F_TIME ] := cTime
-   ::oGrid:aSource[ nRec ] [ F_ATTR ] := cAttr
+   // update Array
+   ::oGrid:aSource[ nRec ] [ LV_NAME ] := TRIM(cFile)
+   ::oGrid:aSource[ nRec ] [ LV_EXT  ] := TRIM(cExt)
+   ::oGrid:aSource[ nRec ] [ LV_SIZE ] := vAR2CHAR( nSize )
+   ::oGrid:aSource[ nRec ] [ LV_DATE ] := CTOD( cDate )
+   ::oGrid:aSource[ nRec ] [ LV_TIME ] := cTime
+   ::oGrid:aSource[ nRec ] [ LV_ATTR ] := cNewAttr
 
    ::oGrid:RefreshCurrent( nRec )
 
@@ -3822,10 +4753,9 @@ METHOD ShowProperty() CLASS TExplorer
 
 LOCAL cPath := ::oGrid:cPath
 LOCAL nSel  := LV_GetSelectionMark( ::oGrid:hLv )
-LOCAL cFile := ::oGrid:aSource[ nSel + 1 ] [ F_NAME ]
+LOCAL cFile := ::oGrid:aSource[ nSel + 1 ] [ LV_NAME ]
 LOCAL aRet
 
-   //   SHOWFILEPROPERTIES( ::oGrid:hLv, cPath, cFile )
    SHOWFILEPROPERTIES( ::oParent:Hwnd, cPath, cFile )
 
 RETURN Nil
@@ -3834,7 +4764,7 @@ METHOD ShowMoreProperty() CLASS TExplorer
 
 LOCAL cPath := ::oGrid:cPath
 LOCAL nSel  := LV_GetSelectionMark( ::oGrid:hLv )
-LOCAL cFile := ::oGrid:aSource[ nSel + 1 ] [ F_NAME ]
+LOCAL cFile := ::oGrid:aSource[ nSel + 1 ] [ LV_NAME ]
 
    ShowMoreProperty( cPath, cFile )                                   // in PROPERTY.PRG
 
@@ -3844,7 +4774,7 @@ METHOD DoRunAsAdmin() CLASS TExplorer
 
 LOCAL cPath := ::oGrid:cPath
 LOCAL nSel  := LV_GetSelectionMark( ::oGrid:hLv )
-LOCAL cFile := ::oGrid:aSource[ nSel + 1 ] [ F_NAME ]
+LOCAL cFile := ::oGrid:aSource[ nSel + 1 ] [ LV_NAME ]
 
    ShellExecute( 0, "runas", cPath + cFile,,, SW_SHOW )
 
@@ -3856,12 +4786,11 @@ LOCAL cUser       := GETENV( "USERPROFILE" )
 LOCAL cStart      := cUser + "\Desktop\"
 LOCAL cPath       := ::oGrid:cPath
 LOCAL nSel        := LV_GetSelectionMark( ::oGrid:hLv )
-LOCAL cFile       := ::oGrid:aSource[ nSel + 1 ] [ F_NAME ]
+LOCAL cFile       := ::oGrid:aSource[ nSel + 1 ] [ LV_NAME ]
 LOCAL cLinkTarget := ""
 LOCAL cLinkFile   := ""
 LOCAL cWorkingDir := ""
 LOCAL cDescr      := ""
-LOCAL cAttr       := ""
 LOCAL cCmdArgs
 
    cWorkingDir := cPath
@@ -3871,6 +4800,234 @@ LOCAL cCmdArgs
    DXE_CreateLink( cLinkTarget, cLinkFile, cWorkingDir, cCmdArgs, cDescr )
 
 RETURN nil
+
+METHOD SendToClipboard() CLASS TExplorer
+
+LOCAL cPath, aItem, aSource
+LOCAL ii, iMax, nPosi, cFile
+LOCAL cText := ""
+
+   IF nGridFocus = 1
+      aSource := oExpl_Left:oGrid:aSource
+      cPath   := oExpl_Left:oGrid:cPath
+      aItem   := oExpl_Left:oGrid:Getdata()
+   ELSE
+      aSource := oExpl_Right:oGrid:aSource
+      cPath   := oExpl_Right:oGrid:cPath
+      aItem   := oExpl_Right:oGrid:Getdata()
+   ENDIF
+   cPath := EndwithSlash( cPath )
+
+   iMax := LEN( aItem )
+   FOR ii := 1 TO iMax
+      nPosi := aItem[ ii ]
+      cFile := aSource[ nPosi ] [ LV_NAME ]
+
+      cText += cPath + cFile + CRLF
+   NEXT
+   cText += CHR( 0 )
+
+   CopyToClipboard( cText )
+
+RETURN nil
+
+METHOD DoMyComBo()
+
+LOCAL WinDir        := GETENV( "Windir" )
+LOCAL cPara         := ""
+LOCAL cAlign        := nOr( DT_LEFT, DT_NOPREFIX )
+LOCAL nIcoHandle    := 0
+LOCAL nSize         := 32
+LOCAL ii, nCount, xPara
+LOCAL oSelf
+LOCAL nIdCtl
+LOCAL oStruc
+LOCAL nPointer
+LOCAL acItem, acType, cItemText, oObj
+LOCAL CtlType
+LOCAL CtlID
+LOCAL itemID
+LOCAL itemAction
+LOCAL itemState
+LOCAL hwndItem
+LOCAL hDC
+LOCAL aRect
+LOCAL nLeft
+LOCAL nTop
+LOCAL nRight
+LOCAL nBottom
+LOCAL itemData
+LOCAL cDLL
+LOCAL hModule
+LOCAL nResID
+LOCAL aBitmaps, hBitMap, acBitmaps
+LOCAL OldAt         := - 1
+LOCAL BrushHiBack   := CreateSolidBrush( BFcolor )
+LOCAL BrushSysColor := CreateSolidBrush( BGcolor )
+LOCAL aGrad         := { ;
+                    { .5, BFcolor, BGcolor }, ;
+                    { .6, BGcolor, BFcolor }, ;
+                    { .1, BFcolor, BGcolor }, ;
+                    }
+
+   nCount := PCOUNT()
+   FOR ii := 1 TO nCount
+      xPara := PValue( ii )
+      DO CASE
+         CASE ii = 1
+            oSelf    := xPara
+         CASE ii = 2
+            nIdCtl   := xPara
+         CASE ii = 3
+            oStruc   := xPara
+         CASE ii = 4
+            nPointer := xPara
+         CASE ii = 5
+            acItem   := xPara
+         CASE ii = 6
+            acType   := xPara
+         CASE ii = 7
+            acBitmaps := xPara
+         CASE ii = 8
+            oObj := xPara
+            IF !EMPTY( oObj )
+               IF VALTYPE( oObj ) = "O"
+                  OldAt := oObj:nAt
+               ENDIF
+            ENDIF
+      ENDCASE
+   NEXT
+
+   CtlType     := oStruc:CtlType
+   CtlID       := oStruc:CtlID
+   itemID      := oStruc:itemID
+   itemAction  := oStruc:itemAction
+   itemState   := oStruc:itemState
+   hwndItem    := oStruc:hwndItem
+   hDC         := oStruc:hDC
+   aRect       := oStruc:aRect
+   itemData    := oStruc:itemData
+
+   nTop     := aRect[ 1 ]
+   nLeft    := aRect[ 2 ]
+   nBottom  := aRect[ 3 ]
+   nRight   := aRect[ 4 ]
+
+   IF CtlType = ODT_COMBOBOX .OR. CtlType = ODT_LISTBOX               // .AND. CtlID =
+
+      SetBkMode( hDC, 1 )                                             // TRANSPARENT =1 OPAQUE =2
+
+      DO CASE
+         CASE itemAction = ODA_SELECT
+            FillRect( hDC, aRect, BrushSysColor )
+            SetTextColor( hDC, BFcolor )
+
+         CASE itemAction = ODA_DRAWENTIRE
+            IF OldAt = itemID + 1 .AND. oObj:IsOpen()
+               OldAt = - 1
+               IF BGColor = 256 * 256 * 256 - 1                       // 16777215
+                  //  Msginfo("white")
+                  FillRect( hDC, aRect, COLOR_MENUHILIGHT + 1 )
+                  SetTextColor( hDC, GetSysColor( COLOR_MENU ) )
+               ELSE
+                  GradientFill( hDC, aRect[ 1 ], aRect[ 2 ], aRect[ 3 ] - 1, aRect[ 4 ], aGrad, .t. )
+                  SetTextColor( hDC, BFcolor )
+               ENDIF
+            ELSE
+               FillRect( hDC, aRect, BrushSysColor )
+               SetTextColor( hDC, BFcolor )
+            ENDIF
+
+         CASE itemAction = ODA_FOCUS
+            IF BGColor = 256 * 256 * 256 - 1                          // 16777215
+               FillRect( hDC, aRect, COLOR_MENUHILIGHT + 1 )
+               SetTextColor( hDC, GetSysColor( COLOR_MENU ) )
+            ELSE
+               GradientFill( hDC, aRect[ 1 ], aRect[ 2 ], aRect[ 3 ] - 1, aRect[ 4 ], aGrad, .t. )
+               SetTextColor( hDC, BFcolor )
+            ENDIF
+
+      ENDCASE
+
+      // use System Icon from DLL
+      IF lUse_IconEx = .T.
+
+         cDLL := WinDir + "\System32\imageres.dll"
+
+         DO CASE
+            CASE acType[ itemID + 1 ] = DRIVE_UNKNOWN
+               nResID := 75
+            CASE acType[ itemID + 1 ] = DRIVE_NO_ROOT_DIR
+               nResID := 32
+
+            CASE acType[ itemID + 1 ] = DRIVE_REMOVABLE
+               IF SUBSTR( acItem[ itemID + 1 ], 1, 1 ) $ "AB"
+                  nResID := 23
+               ELSE
+                  cDLL := WinDir + "\System32\DDORes.dll"
+                  nResID := 2389
+               ENDIF
+
+            CASE acType[ itemID + 1 ] = DRIVE_FIXED
+               IF SUBSTR( acItem[ itemID + 1 ], 1, 2 ) = "C:"
+                  nResID := 36
+               ELSE
+                  nResID := 32
+               ENDIF
+            CASE acType[ itemID + 1 ] = DRIVE_REMOTE
+               nResID := 33
+            CASE acType[ itemID + 1 ] = DRIVE_CDROM
+               nResID := 30
+            CASE acType[ itemID + 1 ] = DRIVE_RAMDISK
+               nResID := 34
+
+         ENDCASE
+
+         hModule := GetModuleHandle( cDLL )
+         IF hModule == 0
+            hModule := LoadLibrary( cDLL )
+         ENDIF
+         nIcoHandle := LOADIMAGERESICON( hModule, nResID, 32 )
+
+         DrawIconEx( hDC, ;
+                     nTop - 4, ;
+                     nLeft, ;
+                     nIcoHandle, ;
+                     nSize, ;
+                     nSize, ;
+                     0, ;                                             // _In_     UINT   istepIfAniCur,
+                     0, ;                                             // _In_opt_ HBRUSH hbrFlickerFreeDraw,
+                     nOr( DI_NORMAL ) )                               // _In_     UINT   diFlags
+
+         DestroyIcon( nIcoHandle )
+         FreeLibrary( hModule )
+
+      ELSE                                       // use Resource
+
+         aBitmaps := FW_ReadImage( nil, acBitmaps[ itemID + 1 ], { nSize - 2, nSize - 2 }, .F. )
+         hBitMap  := aBitmaps[ 1 ]
+
+         DrawBitmap( hDC, hBitMap, nTop + 3, nLeft, nSize - 3, nSize - 6 )
+
+         PalBmpFree( aBitmaps )
+         DeleteObject( hBitMap )
+
+      ENDIF
+
+      nLeft += 32 + 4
+
+      cItemText := acItem[ itemID + 1 ]
+
+      DrawText( hDC, ;
+                cItemText, ;
+                { nTop + 4, nLeft, nBottom, nRight }, ;
+                cAlign )
+   ENDIF
+
+   DeleteObject( BrushHiBack )
+   DeleteObject( BrushSysColor )
+
+RETURN .T.
 
 *+--------------------------------------------------------------------
 *+
@@ -3896,4 +5053,27 @@ PROCEDURE TAB_CHANGE_RIGHT()
 
 RETURN
 
+*+--------------------------------------------------------------------
+*+
+*+    Class TMyWindow
+*+
+*+--------------------------------------------------------------------
+*+
+CLASS TMyWindow FROM TWindow
+
+   CLASSDATA lRegistered
+
+   METHOD HandleEvent( nMsg, nWParam, nLParam )
+
+   ENDCLASS
+
+METHOD HandleEvent( nMsg, nWParam, nLParam ) CLASS TMyWindow
+
+   IF nMsg == WM_POWERBROADCAST
+      RETURN BROADCAST_QUERY_DENY
+   ENDIF
+
+RETURN ::Super:HandleEvent( nMsg, nWParam, nLParam )
+
 *+ EOF: DUALGRID.PRG
+

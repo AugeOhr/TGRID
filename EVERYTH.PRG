@@ -2,20 +2,21 @@
 *+
 *+ Source Module => c:\fwh\0\LISTVIEW\EVERYTH.PRG
 *+
-*+    Copyright(C) 1983-2022 by Auge & Ohr
+*+    Copyright(C) 1983-2023 by Auge & Ohr
 *+
 *+    Functions: Procedure SearchWithEverything()
 *+               Static Function EverySearch()
 *+               Function RECUDIRS()
 *+
-*+    Reformatted by Click! 2.05.40 on Jan-7-2023 at  1:29 am
+*+    Reformatted by Click! 2.05.40 on Mar-11-2023 at  8:22 am
 *+
 *+--------------------------------------------------------------------
 
 #include "FiveWin.ch"
-#include "Directry.ch"
 #include "DLL.CH"
+
 #include "EVERY.CH"
+#include "DUALGRID.CH"
 
 #define EM_SETSEL             0x00B1
 
@@ -180,25 +181,25 @@ LOCAL n_Count
 LOCAL nSum    := 0
 LOCAL cTemp, aFiles, ii, iMax, a_File := {}
 
-   a_DIR := DIRECTORY( cPath + "*.*", "D" )
+   a_DIR := My_Directory( cPath + "*.*", "D" )
    n_LEN := LEN( a_DIR )
 
    FOR n_Count := 1 TO n_LEN
-      c_File := a_DIR[ n_Count, F_NAME ]
-      c_Attr := a_DIR[ n_Count, F_ATTR ]
+      c_File := a_DIR[ n_Count, LV_NAME ]
+      c_Attr := a_DIR[ n_Count, LV_ATTR ]
 
       IF "D" $ c_Attr .AND. .NOT. ( c_File = "." .OR. c_File = ".." )
          RECUDIRS( cPath + c_File + "\", cMask, cAttr )
       ENDIF
    NEXT
 
-   a_DIR := DIRECTORY( cPath + cMask )
+   a_DIR := My_Directory( cPath + cMask )
    n_LEN := LEN( a_DIR )
 
    FOR n_Count := 1 TO n_LEN
-      c_File := a_DIR[ n_Count, F_NAME ]
-      c_Attr := a_DIR[ n_Count, F_ATTR ]
-      n_Size := a_DIR[ n_Count, F_SIZE ]
+      c_File := a_DIR[ n_Count, LV_NAME ]
+      c_Attr := a_DIR[ n_Count, LV_ATTR ]
+      n_Size := a_DIR[ n_Count, LV_SIZE ]
 
       IF "D" $ c_Attr
       ELSE

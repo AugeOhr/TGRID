@@ -2,13 +2,12 @@
 *+
 *+ Source Module => c:\fwh\0\LISTVIEW\HBEJECT.PRG
 *+
-*+    Copyright(C) 1983-2022 by Auge & Ohr
+*+    Copyright(C) 1983-2023 by Auge & Ohr
 *+
 *+    Functions: Procedure USBeject()
 *+               Static Procedure EjectMedia()
-*+               Function SHELLOPENFILE()
 *+
-*+    Reformatted by Click! 2.05.40 on Jan-7-2023 at  1:29 am
+*+    Reformatted by Click! 2.05.40 on Mar-11-2023 at  8:22 am
 *+
 *+--------------------------------------------------------------------
 
@@ -21,6 +20,7 @@
 MEMVAR oFontDefault
 MEMVAR oFontBig
 MEMVAR BFcolor, BGcolor
+MEMVAR bGradient
 
 *+--------------------------------------------------------------------
 *+
@@ -47,7 +47,7 @@ LOCAL bWhen
 LOCAL bDrawItem
 LOCAL ii, iMax
 LOCAL oImageList, iImage, iImage_0, aItem, nFirstUSB := 0
-LOCAL oGrid, oBmp1
+LOCAL oGrid, oBmp1, oButton1, oButton2
 LOCAL cMsg         := ""
 LOCAL lPixel       := .T.
 LOCAL lDesign      := .F.
@@ -73,8 +73,12 @@ LOCAL bAction      := { | x | cDrive := acItem[ x ] }
 
       AADD( aHeader, { "Drive", 200, 0, "C" } )
       AADD( aHeader, { "Type", 100, 0, "N" } )
+
       oGrid:aHeader := aHeader
       oGrid:aSource := aDrives[ 1 ]
+
+      // paint Grid_Header
+      oGrid:Use_Customdraw := .T.
 
       oGrid:CreateHeaderColumn()
 
@@ -110,11 +114,14 @@ LOCAL bAction      := { | x | cDrive := acItem[ x ] }
 
       oGrid:bClick := { | nItem | EjectMedia( cDrive ), oDlg:End() }
 
-      @ 000, 304 BUTTON "&OK" OF oDlg SIZE 120, 160 PIXEL FONT oFontDefault ;
+      @ 000, 304 BTNBMP oButton1 PROMPT "&OK" SIZE 120, 160 PIXEL OF oDlg FONT oFontDefault COLOR BFcolor, BGcolor CENTER ;         
               ACTION( EjectMedia( cDrive ), oDlg:End() )              // DEFAULT
 
-      @ 190, 304 BUTTON "&Cancel" OF oDlg SIZE 120, 160 PIXEL FONT oFontDefault ;
+      @ 190, 304 BTNBMP oButton2 PROMPT "&Cancel" SIZE 120, 160 PIXEL OF oDlg FONT oFontDefault COLOR BFcolor, BGcolor CENTER ;         
               ACTION( cDrive := nil, oDlg:End() )
+
+      oButton1:bClrGrad := bGradient
+      oButton2:bClrGrad := bGradient
 
 #IFDEF __HMG__
    END WINDOW
@@ -150,7 +157,7 @@ LOCAL cAction := GETENV( "SYSTEMROOT" ) + "\SYSTEM32\HOTPLUG.DLL"
       // MsgInfo( "The Drive " + cDriveLetter + " Can be Safely Removed", "Atenttion ! , Remove USB Ok" )
 
       MEMOWRIT( cPath + "ShowMsg.BAT", cRoot + cAction )
-      ShellOpenFile( cPath, "ShowMsg.BAT",,, SW_MINIMIZE )
+      ShellExecute( 0, "open", cPath + "ShowMsg.BAT",,, SW_HIDE )
       hb_IdleSleep( 2.0 )
       FERASE( cPath + "ShowMsg.BAT" )
 
@@ -158,100 +165,5 @@ LOCAL cAction := GETENV( "SYSTEMROOT" ) + "\SYSTEM32\HOTPLUG.DLL"
       MsgInfo( "Failed to Safely Remove/Eject Drive " + cDriveLetter, "Atenttion ! , Failed Remove USB" )
    ENDIF
 RETURN
-
-*+--------------------------------------------------------------------
-*+
-*+    Function SHELLOPENFILE()
-*+
-*+    Called from ( hbeject.prg )   1 - static procedure ejectmedia()
-*+
-*+--------------------------------------------------------------------
-*+
-FUNCTION SHELLOPENFILE( cPath, cFILE, cPara, cHome, nShow )
-
-LOCAL lSuccess   := 0
-LOCAL Retvar     := .F.
-LOCAL bSaveError, oError
-
-   DEFAULT cPath := ""
-   DEFAULT cFILE := ""
-   DEFAULT cPara := ""
-   DEFAULT cHome := CURDIR()
-   DEFAULT nShow := SW_NORMAL
-
-   IF hb_OSIS64BIT()
-      // disable before API Call
-      DllCall( "Kernel32.dll", DLL_OSAPI, "Wow64EnableWow64FsRedirection", FALSE )
-   ENDIF
-
-   bSaveError := ERRORBLOCK( { | oError | BREAK( oError ) } )
-   BEGIN SEQUENCE
-
-      lSuccess := ShellExecute( 0, ;
-                                "open", ;
-                                cPath + cFILE, ;
-                                cPara, ;
-                                cHome, ;
-                                nShow )
-
-   RECOVER
-   END SEQUENCE
-   ERRORBLOCK( bSaveError )
-
-   DO CASE
-
-      CASE lSuccess > 32                                              // Aufruf erfolgreich
-         Retvar := .T.
-
-      CASE lSuccess = SE_ERR_NOASSOC                                  // Keine verknÂpfte Anwendung
-
-         // Falls ShowOpenWithDialog = True, wird der Dialog
-         // "”ffnen mit" fr diese Datei angezeigt:
-         // Shell "RunDLL32 shell32.dll,OpenAs_RunDLL " & Filename
-
-         DllCall( "shell32", DLL_OSAPI, "OpenAs_RunDLL", ;
-                  0, ;
-                  0, ;
-                  cPath + cFile, ;
-                  cPara, ;
-                  0, ;
-                  nShow )
-
-         // Die Auswahlm”glichkeit wird als Erfolg gewertet:
-         Retvar := .T.
-
-      OTHERWISE
-         // ShellExecute war erfolglos.
-         // Boolean-Standardwert False zurckgeben
-         DO CASE
-            CASE lSuccess = SE_ERR_FNF
-               MsgInfo( "File not found.", cPath + cFILE )
-            CASE lSuccess = SE_ERR_PNF
-               MsgInfo( "Path not found.", cPath + cFILE )
-            CASE lSuccess = SE_ERR_ACCESSDENIED
-               MsgInfo( "Access denied !", cPath + cFILE )
-            CASE lSuccess = SE_ERR_OOM
-               MsgInfo( "Out of memory !", cPath + cFILE )
-            CASE lSuccess = SE_ERR_SHARE
-               MsgInfo( "Cannot share an open file.", cPath + cFILE )
-            CASE lSuccess = SE_ERR_ASSOCINCOMPLETE
-               MsgInfo( "File association information not complete.", cPath + cFILE )
-            CASE lSuccess = SE_ERR_DDETIMEOUT
-               MsgInfo( "DDE operation timed out.", cPath + cFILE )
-            CASE lSuccess = SE_ERR_DDEFAIL
-               MsgInfo( "DDE operation failed.", cPath + cFILE )
-            CASE lSuccess = SE_ERR_DDEBUSY
-               MsgInfo( "DDE operation is busy.", cPath + cFILE )
-         ENDCASE
-         Retvar := .F.
-   ENDCASE
-
-   IF hb_OSIS64BIT()
-      DllCall( "Kernel32.dll", DLL_OSAPI, "Wow64EnableWow64FsRedirection", TRUE )                                                           // enable again
-   ENDIF
-
-   Sysrefresh()
-
-RETURN Retvar
 
 *+ EOF: HBEJECT.PRG

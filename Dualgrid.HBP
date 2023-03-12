@@ -1,4 +1,4 @@
--gui
+-gui -mt
 -Ic:\fwh64\include
 DUALGRID.PRG
 TGRID.PRG

@@ -22,7 +22,7 @@ PROPERTY.PRG \
 EVERYTH.PRG  \
 HB_FUNC.PRG
 
-PROJECT    : DUALGRID.exe
+PROJECT    : DUALGRID.EXE
 
 DUALGRID.exe  : $(PRG:.PRG=.OBJ) DUALGRID.res
    @echo off
@@ -32,7 +32,7 @@ DUALGRID.exe  : $(PRG:.PRG=.OBJ) DUALGRID.res
    echo DUALGRID.map, + >> b32.bc
    echo $(FWDIR)\lib\FiveH.lib $(FWDIR)\lib\FiveHC.lib + >> b32.bc
    echo $(HBDIR)\lib\win\bcc\hbrtl.lib + >> b32.bc
-   echo $(HBDIR)\lib\win\bcc\hbvm.lib + >> b32.bc
+   echo $(HBDIR)\lib\win\bcc\hbvmmt.lib + >> b32.bc
    echo $(HBDIR)\lib\win\bcc\gtgui.lib + >> b32.bc
    echo $(HBDIR)\lib\win\bcc\hblang.lib + >> b32.bc
    echo $(HBDIR)\lib\win\bcc\hbmacro.lib + >> b32.bc
@@ -65,7 +65,7 @@ DUALGRID.exe  : $(PRG:.PRG=.OBJ) DUALGRID.res
 
    echo $(FWDIR)\lib\dolphin.lib +  >> b32.bc
    
-   echo $(BCDIR)\lib\cw32.lib + >> b32.bc
+   echo $(BCDIR)\lib\cw32mt.lib + >> b32.bc
    echo $(BCDIR)\lib\uuid.lib + >> b32.bc 
    echo $(BCDIR)\lib\ws2_32.lib +  >> b32.bc
    echo $(BCDIR)\lib\psdk\gdiplus.lib +  >> b32.bc
@@ -83,7 +83,7 @@ DUALGRID.exe  : $(PRG:.PRG=.OBJ) DUALGRID.res
    del b32.bc
 
 .PRG.OBJ:
-  $(HBDIR)\bin\harbour $< /L /N /W /Oobj\ /I$(FWDIR)\include;$(HBDIR)\include;$(BCDIR)\include\windows
+  $(HBDIR)\bin\harbour $< /N /W /Oobj\ /I$(FWDIR)\include;$(HBDIR)\include;$(BCDIR)\include\windows
 
   $(BCDIR)\bin\bcc32 -c -tWM -I$(HBDIR)\include -oobj\$& obj\$&.c
 

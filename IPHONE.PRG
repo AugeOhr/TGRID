@@ -2,7 +2,7 @@
 *+
 *+ Source Module => c:\fwh\0\LISTVIEW\IPHONE.PRG
 *+
-*+    Copyright(C) 1983-2022 by Auge & Ohr
+*+    Copyright(C) 1983-2023 by Auge & Ohr
 *+
 *+    Functions: Procedure iPhoneWin()
 *+               Static Function OnEnd()
@@ -12,12 +12,11 @@
 *+               Static Procedure SelectDevice()
 *+               Static Procedure DoTreeRecursiv()
 *+               Static Procedure DoCopySingle()
-*+               Static Function GoNext()
 *+               Static Procedure ShowGrid()
 *+               Static Procedure GetTargetFolder()
 *+               Static Procedure Start_CopyHere()
 *+
-*+    Reformatted by Click! 2.05.40 on Jan-7-2023 at  1:29 am
+*+    Reformatted by Click! 2.05.40 on Mar-11-2023 at  8:22 am
 *+
 *+--------------------------------------------------------------------
 
@@ -55,6 +54,7 @@ STATIC lRecursiv  := .F.
 STATIC c_Target
 
 MEMVAR BFcolor, BGcolor
+MEMVAR bGradient
 
 *+--------------------------------------------------------------------
 *+
@@ -74,6 +74,7 @@ LOCAL bAction   := { || nil }
 LOCAL nIcoLarge := 32
 LOCAL nIcoSmall := 32
 LOCAL lCheckbox := .T.
+LOCAL lDispInfo := .F.
 
    IF !EMPTY( cPara )
       c_Target := EndwithSlash( cPara )
@@ -88,19 +89,23 @@ LOCAL lCheckbox := .T.
 #ENDIF
 
    AADD( aHeader, { "Name", 200, 0, "C" } )
+   AADD( aHeader, { "Ext", 001, 1, "C" } )
    AADD( aHeader, { "Size", 150, 1, "N" } )
    AADD( aHeader, { "Date", 110, 1, "D" } )
-   AADD( aHeader, { "Time", 090, 1, "C" } )
-   AADD( aHeader, { "Note", 250, 0, "C" } )
+   AADD( aHeader, { "Type", 260, 0, "C" } )
+   AADD( aHeader, { "Note", 050, 0, "C" } )
 
-   aGridfiles := DIRECTORY( "*.*", "DHS" )
+   aGridfiles := My_DIRECTORY( "*.*", "DHS" )
 
    DEFINE WINDOW oIPHONE FROM 0, 0 TO 768, 1024 PIXEL TITLE "Device " ICON "A1MAIN" COLOR BFcolor, BGcolor NOMINIMIZE NOMAXIMIZE
 
       oGrid := TGrid() :New( 20, 220, aPrompts, bAction, oIPHONE, BFcolor, BGcolor, ;
-                       lPixel, lDesign, 780, 600, cMsg, nIcoLarge, nIcoSmall, lCheckbox )
+                       lPixel, lDesign, 780, 600, cMsg, nIcoLarge, nIcoSmall, lCheckbox, lDispInfo )
+
       oGrid:aHeader := aHeader
       oGrid:aSource := aGridfiles
+      // paint Grid_Header
+      oGrid:Use_Customdraw := .T.
 
       oTree_1 := TTreeView() :New( 20, 10, oIPHONE, BFcolor, BGcolor, lPixel, lDesign, nWidth, nHeight, cMsg, lCheckBoxes, bChange, lEditable )
 
@@ -112,11 +117,15 @@ LOCAL lCheckbox := .T.
 
       oTree_1:bLDblClick = { || DoTreeAction( oTree_1:GetSelected() ) }
 
-      @ 624, 010 BUTTON oButton_Target PROMPT "&Target Folder" SIZE 200, 30 PIXEL FONT oFontDefault ACTION GetTargetFolder() OF oIPHONE
+      @ 624, 010 BTNBMP oButton_Target PROMPT "&Target Folder" SIZE 200, 30 PIXEL FONT oFontDefault ACTION GetTargetFolder() OF oIPHONE
       @ 624, 220 GET oTargetDir VAR c_Target SIZE 780, 30 PIXEL FONT oFontDefault OF oIPHONE         
 
-      @ 660, 010 BUTTON oButton_CopyHere PROMPT "&CopyHere" SIZE 100, 30 PIXEL FONT oFontDefault ACTION Start_CopyHere( .F. ) OF oIPHONE
-      @ 660, 110 BUTTON oButton_MoveHere PROMPT "&MoveHere" SIZE 100, 30 PIXEL FONT oFontDefault ACTION Start_CopyHere( .T. ) OF oIPHONE
+      @ 660, 010 BTNBMP oButton_CopyHere PROMPT "&CopyHere" SIZE 100, 30 PIXEL FONT oFontDefault ACTION Start_CopyHere( .F. ) OF oIPHONE
+      @ 660, 110 BTNBMP oButton_MoveHere PROMPT "&MoveHere" SIZE 100, 30 PIXEL FONT oFontDefault ACTION Start_CopyHere( .T. ) OF oIPHONE
+
+      oButton_Target:bClrGrad := bGradient
+      oButton_CopyHere:bClrGrad := bGradient
+      oButton_MoveHere:bClrGrad := bGradient
 
 #IFDEF __HMG__
    END WINDOW
@@ -369,7 +378,7 @@ LOCAL oItemParent
                   c_Date := xFolderItem:ModifyDate
                   c_Type := xFolderItem:Type
                   c_Attr := ""
-                  AADD( aGridfiles, { c_Name, c_Size, c_Date, c_Attr, c_Type, LTRIM( STR( xLevel + 1 ) ) } )
+                  AADD( aGridfiles, { c_Name, "", c_Size, c_Date, c_Type, LTRIM( STR( xLevel + 1 ) ) } )
                ENDIF
             ENDIF
          NEXT
@@ -458,31 +467,6 @@ LOCAL nMask   := hb_BitOr( LVIS_SELECTED, LVIS_FOCUSED )
    SYSrefresh()
 
 RETURN
-
-*+--------------------------------------------------------------------
-*+
-*+    Static Function GoNext()
-*+
-*+--------------------------------------------------------------------
-*+
-STATIC FUNCTION GoNext()
-
-LOCAL oSelItem := oTree_1:GetSelected(), lStop := .F., oNextItem
-LOCAL lRet     := .T.
-
-   oTree_1:Scan( { | oItem | IF( oItem:hItem == oSelItem:hItem, lStop := .T., ), ;
-                   IF( lStop .AND. oItem:hItem != oSelItem:hItem, ( oNextItem := oItem, .T. ), .F. ) } )
-
-   IF oNextItem != nil
-      oTree_1:Select( oNextItem )
-      IF oNextItem:Cargo[ 2 ] = oTreeLast:Cargo[ 2 ]
-         lRet := .F.
-      ENDIF
-   ELSE
-      lRet := .F.
-   ENDIF
-
-RETURN lRet
 
 *+--------------------------------------------------------------------
 *+

@@ -2,7 +2,7 @@
 *+
 *+ Source Module => c:\fwh\0\LISTVIEW\CODEPAGE.PRG
 *+
-*+    Copyright(C) 1983-2022 by Auge & Ohr
+*+    Copyright(C) 1983-2023 by Auge & Ohr
 *+
 *+    Functions: Procedure ChangeCodePage()
 *+               Static Procedure DoSetNewCP()
@@ -12,7 +12,7 @@
 *+
 *+       Tables: USE (cPath+cFile) VIA (cVia) ALIAS (cAlias) EXCLUSIVE CODEPAGE TRIM(cCodepage)
 *+
-*+    Reformatted by Click! 2.05.40 on Jan-7-2023 at  1:29 am
+*+    Reformatted by Click! 2.05.40 on Mar-11-2023 at  8:21 am
 *+
 *+--------------------------------------------------------------------
 

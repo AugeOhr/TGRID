@@ -19,12 +19,6 @@
 #define CLR_NONE              0xFFFFFFFF
 #define CLR_DEFAULT           0xFF000000
 
-#define COLOR_WINDOW          5
-#define COLOR_WINDOWTEXT      8
-#define COLOR_BTNFACE         15
-#define COLOR_BTNSHADOW       16
-#define COLOR_BTNHIGHLIGHT    20
-
 #define SW_HIDE               0
 #define SW_NORMAL             1
 #define SW_SHOW               5
@@ -40,8 +34,6 @@
 #define ID_WIDTH              2
 #define ID_ALIGN              3
 #define ID_TYPE               4
-
-#define LVCFMT_CENTER         0x02
 
 #define LVM_FIRST             4096 // 0x1000
 #define LVM_SETIMAGELIST      ( LVM_FIRST + 3 )
@@ -86,6 +78,9 @@
 
 #define LVCFMT_LEFT           0
 #define LVCFMT_RIGHT          0x01
+#define LVCFMT_CENTER         0x02
+#define LVCFMT_COL_HAS_IMAGES 0x8000
+#define LVCFMT_IMAGE          0x0800
 
 #define LVCF_FMT              0x01
 #define LVCF_IMAGE            0x10
@@ -97,8 +92,13 @@
 #define LVIS_FOCUSED          0x01
 #define LVIS_SELECTED         0x02
 
+#define LVIS_UNCHECKED 0x1000
+#define LVIS_CHECKED   0x2000
+
 #define LVNI_FOCUSED          0x01
 #define LVNI_SELECTED         0x02
+
+#define LVIF_STATE            0x08
 
 #define DWM_BB_ENABLE                  0x00000001
 #define DWM_BB_BLURREGION              0x00000002
@@ -136,4 +136,8 @@
 #define HDN_BEGINTRACK         (HDN_FIRST-6)
 #define HDN_ENDTRACK           (HDN_FIRST-7)
 #define HDN_TRACK              (HDN_FIRST-8)
-
+
+#define HDM_FIRST                                               0x1200
+#define HDM_SETIMAGELIST                                        (HDM_FIRST +  8)
+
+#define NM_CUSTOMDRAW                                           (NM_FIRST-12)

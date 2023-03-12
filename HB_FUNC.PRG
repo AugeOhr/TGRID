@@ -53,6 +53,11 @@ ListView_GetCheckState              https://learn.microsoft.com/en-us/windows/wi
 
 #define AVOID_COMPILER_WARNING   // by Dr. Claudio Soto (November 2013)
 
+#define LVIS_UNCHECKED 0x1000
+#define LVIS_CHECKED   0x2000
+
+static void ShowNotifyInfo(HWND hWnd, BOOL bAdd, HICON hIcon, LPSTR szText, LPSTR szInfo, LPSTR szInfoTitle);
+
 // #define UNICODE
 LPWSTR AnsiToWide( LPSTR cAnsi );
 
@@ -61,7 +66,7 @@ BOOL EjectVolume(TCHAR cDriveLetter);
 HANDLE OpenVolume(TCHAR cDriveLetter);
 BOOL LockVolume(HANDLE hVolume);
 BOOL DismountVolume(HANDLE hVolume);
-BOOL PreventRemovalOfVolume(HANDLE hVolume, BOOL fPrevent);
+BOOL PreventRemovalOfVolume(HANDLE hVolume , BOOL fPrevent);
 BOOL AutoEjectVolume(HANDLE hVolume);
 BOOL CloseVolume(HANDLE hVolume);
 
@@ -138,17 +143,7 @@ BOOL DismountVolume( HANDLE hVolume )
                            &dwBytesReturned, NULL );
 }
 
-BOOL PreventRemovalOfVolume(HANDLE hVolume, BOOL fPreventRemoval)
-{
-   DWORD dwBytesReturned;
-   PREVENT_MEDIA_REMOVAL PMRBuffer;
-   PMRBuffer.PreventMediaRemoval = fPreventRemoval;
-   return DeviceIoControl( hVolume, IOCTL_STORAGE_MEDIA_REMOVAL,
-                           &PMRBuffer, sizeof(PREVENT_MEDIA_REMOVAL),
-                           NULL, 0, &dwBytesReturned, NULL );
-}
-
-AutoEjectVolume( HANDLE hVolume )
+BOOL AutoEjectVolume( HANDLE hVolume )
 {
    DWORD dwBytesReturned;
    return DeviceIoControl( hVolume, IOCTL_STORAGE_EJECT_MEDIA, NULL, 0, NULL, 0,
@@ -185,32 +180,28 @@ BOOL EjectVolume( TCHAR cDriveLetter )
    return  bResult ;
 }
 
+
+typedef struct _PREVENT_MEDIA_REMOVALX {
+  BOOL PreventMediaRemoval;
+} PREVENT_MEDIA_REMOVALX, *PPREVENT_MEDIA_REMOVALX;
+
+BOOL PreventRemovalOfVolume(HANDLE hVolume, BOOL fPrevent )
+{
+   DWORD dwBytesReturned;
+   PREVENT_MEDIA_REMOVALX PMRBuffer;
+
+   PMRBuffer.PreventMediaRemoval = (BOOL) fPrevent ;
+   return DeviceIoControl( hVolume, IOCTL_STORAGE_MEDIA_REMOVAL,
+                           &PMRBuffer, sizeof(PREVENT_MEDIA_REMOVALX),
+                           NULL, 0, &dwBytesReturned, NULL );
+}
+
 HB_FUNC( EJECTREMOVABLE )
 {
    hb_retl( EjectVolume( ( TCHAR ) * hb_parc( 1 ) ) );
    return;
 }
 
-HB_FUNC( DISMOUNTVOLUME )
-{
-   #ifndef _WIN64
-      HWND hWnd = ( HWND ) hb_parnl( 1 );
-   #else
-      HWND hWnd = ( HWND ) hb_parnll( 1 );
-   #endif
-   hb_retl( DismountVolume( hWnd ) );
-}
-
-SECURITY_ATTRIBUTES sa;
-
-HB_FUNC( LPSECURITY_ATTRIBUTES )
-{
-   sa.nLength = sizeof( sa );
-   sa.lpSecurityDescriptor = NULL;
-   sa.bInheritHandle = hb_parl( 1 );
-
-   hb_retnll( ( LONGLONG ) &sa );
-}
 
 HB_FUNC( C_GETSPECIALFOLDER ) // Contributed By Ryszard Ryüko
 {
@@ -220,20 +211,6 @@ HB_FUNC( C_GETSPECIALFOLDER ) // Contributed By Ryszard Ryüko
    SHGetPathFromIDList(pidlBrowse,lpBuffer);
    hb_retc(lpBuffer);
    hb_xfree( lpBuffer);
-}
-
-HB_FUNC( DEVICECHANGEINFO ) // DeviceChangeInfo( wParam, lParam )
-{
-//   WPARAM wParam = hb_parnl( 1 );
-   PDEV_BROADCAST_HDR lpdb = (PDEV_BROADCAST_HDR) hb_parnll( 2 );
-//   TCHAR szMsg[80];
-
-   if ( lpdb->dbch_devicetype == DBT_DEVTYP_VOLUME )
-   {
-      PDEV_BROADCAST_VOLUME lpdbv = (PDEV_BROADCAST_VOLUME) lpdb;
-      hb_retnl( lpdbv->dbcv_unitmask );
-   } else hb_retnl( 0 );
-
 }
 
 HB_FUNC( SHFILE )
@@ -285,7 +262,7 @@ HB_FUNC( GETKEYBOARDLAYOUT )
 {
    DWORD idThread = (DWORD) hb_parni (1);   // Zero for the current thread
    HKL hkl = GetKeyboardLayout (idThread);
-   hb_retnll ((LONG_PTR) hkl );
+   hb_retnll( ( LONG_PTR ) hkl );
 }
 
 HB_FUNC( FINDWINDOWEX )
@@ -299,44 +276,10 @@ HB_FUNC( FINDWINDOWEX )
    #endif
 
 
-   hb_retnll((LONG_PTR)  FindWindowEx ( hWnd ,
-                                        hWnd2,
-                                        hb_parc  (3),
-                                        hb_parc  (4)  ));
-}
-
-HB_FUNC( XDRAWTEXT )
-{
-   #ifndef _WIN64
-      HWND hWnd = ( HWND ) hb_parnl( 1 );
-   #else
-      HWND hWnd = ( HWND ) hb_parnll( 1 );
-   #endif
-   RECT rct;
-
-      rct.top    = hb_parvni( 3, 1 );
-      rct.left   = hb_parvni( 3, 2 );
-      rct.bottom = hb_parvni( 3, 3 );
-      rct.right  = hb_parvni( 3, 4 );
-
-      hb_retni( DrawText( ( HDC ) hWnd ,
-                                  hb_parc( 2 ),
-                                  -1,
-                                  &rct,
-                                  hb_parnl( 4 ) ) );
-      hb_storvni( rct.top, 3, 1 );
-      hb_storvni( rct.left, 3, 2 );
-      hb_storvni( rct.bottom, 3, 3 );
-      hb_storvni( rct.right, 3, 4 );
-}
-
-HB_FUNC( IMAGELIST_REMOVEALL )
-{
-   #ifndef _WIN64
-   ImageList_RemoveAll( ( HIMAGELIST ) hb_parnl( 1 ) );
-   #else
-   ImageList_RemoveAll( ( HIMAGELIST ) hb_parnll( 1 ) );
-   #endif
+   hb_retnll( ( LONG_PTR )  FindWindowEx ( hWnd ,
+                                           hWnd2,
+                                           hb_parc  (3),
+                                           hb_parc  (4)  ));
 }
 
 HB_FUNC( REDRAWWINDOW )
@@ -349,10 +292,72 @@ HB_FUNC( REDRAWWINDOW )
    RedrawWindow (hWnd, NULL , NULL , RDW_ERASE | RDW_FRAME | RDW_INVALIDATE | RDW_ALLCHILDREN | RDW_ERASENOW | RDW_UPDATENOW );
 }
 
-//******************************** Listview ********************************
+//********************************************************************************************************
+// Shell_NotifyIcon
+//********************************************************************************************************
+
+HB_FUNC( SHOWNOTIFYINFO )
+{
+   #ifndef _WIN64
+      HWND hWnd = ( HWND ) hb_parnl( 1 );
+   #else
+      HWND hWnd = ( HWND ) hb_parnll( 1 );
+   #endif
+
+   HICON hIcon;
+   if ( HB_ISNUM( 3 ) )
+   {
+      hIcon = LoadIcon( ( HINSTANCE ) GetModuleHandle (NULL), MAKEINTRESOURCE( hb_parni( 3 ) ) );
+   }
+   else
+   {
+      hIcon = ( HICON ) LoadImage( ( HINSTANCE ) NULL, hb_parc( 3 ), IMAGE_ICON, 0, 0, LR_LOADFROMFILE );
+   }
+
+   ShowNotifyInfo( (HWND) hWnd, (BOOL) hb_parl(2), hIcon , (LPSTR) hb_parc(4), (LPSTR) hb_parc(5), (LPSTR) hb_parc(6) );
+}
+
+static void ShowNotifyInfo(HWND hWnd, BOOL bAdd, HICON hIcon, LPSTR szText, LPSTR szInfo, LPSTR szInfoTitle)
+{
+    NOTIFYICONDATA nid;
+
+    ZeroMemory( &nid, sizeof(nid) );
+
+    nid.cbSize       = sizeof(NOTIFYICONDATA);
+    nid.hIcon        = hIcon;
+    nid.hWnd         = hWnd;
+    nid.uID          = 0;
+    nid.uFlags       = NIF_INFO | NIF_TIP | NIF_ICON ;
+    nid.dwInfoFlags  = NIIF_INFO ;
+
+    lstrcpy( nid.szTip, TEXT(szText) );
+    lstrcpy( nid.szInfo, TEXT(szInfo) );
+    lstrcpy( nid.szInfoTitle, TEXT(szInfoTitle) );
+
+    if(bAdd)
+        Shell_NotifyIcon( NIM_ADD, &nid );
+    else
+        Shell_NotifyIcon( NIM_DELETE, &nid );
+
+    if(hIcon)
+        DestroyIcon( hIcon );
+}
+
+//********************************************************************************************************
+// Listview API Function
+//********************************************************************************************************
+
+HB_FUNC( IMAGELIST_REMOVEALL )                   // ok
+{
+   #ifndef _WIN64
+   ImageList_RemoveAll( ( HIMAGELIST ) hb_parnl( 1 ) );
+   #else
+   ImageList_RemoveAll( ( HIMAGELIST ) hb_parnll( 1 ) );
+   #endif
+}
 
 // LV_ADDITEM ( hWnd, aItem, [nRow] )
-HB_FUNC( LV_ADDITEM )
+HB_FUNC( LV_ADDITEM )                            // ok
 {
    LV_ITEM lvi;
    WORD nColumnCount;
@@ -370,7 +375,7 @@ HB_FUNC( LV_ADDITEM )
    else
       nRow = hb_parni (3);
 
-   lvi.mask       = LVIF_TEXT ;
+   lvi.mask       = LVIF_TEXT | LVIF_DI_SETITEM ;
    lvi.state      = 0;
    lvi.stateMask  = 0;
    lvi.iImage     = -1;
@@ -386,7 +391,7 @@ HB_FUNC( LV_ADDITEM )
 }
 
 // LV_ADDITEMS ( hWnd, aItem, iImage, [nRow] )
-HB_FUNC( LV_ADDITEMS )
+HB_FUNC( LV_ADDITEMS )                           // ok
 {
    LV_ITEM lvi;
    WORD nColumnCount;
@@ -404,7 +409,7 @@ HB_FUNC( LV_ADDITEMS )
    else
       nRow = hb_parni (4);
 
-   lvi.mask       = LVIF_TEXT | LVIF_IMAGE;
+   lvi.mask       = LVIF_TEXT | LVIF_IMAGE | LVIF_DI_SETITEM ;
    lvi.state      = 0;
    lvi.stateMask  = 0;
    lvi.iImage     = hb_parni (3);
@@ -420,7 +425,7 @@ HB_FUNC( LV_ADDITEMS )
 }
 
 // LV_ADDCOLUMN( hWnd, nSubItem, nWeight, cText, nFMT )
-HB_FUNC( LV_ADDCOLUMN )
+HB_FUNC( LV_ADDCOLUMN )                          // ok
 {
    #ifndef _WIN64
       HWND hWnd = ( HWND ) hb_parnl( 1 );
@@ -439,7 +444,7 @@ HB_FUNC( LV_ADDCOLUMN )
 }
 
 // LV_ChangeExtendedStyle ( hWnd, [ nAddStyle ], [ nRemoveStyle ] )
-HB_FUNC( LV_CHANGEEXTENDEDSTYLE )
+HB_FUNC( LV_CHANGEEXTENDEDSTYLE )                // ok
 {
    #ifndef _WIN64
       HWND hWnd = ( HWND ) hb_parnl( 1 );
@@ -461,7 +466,7 @@ HB_FUNC( LV_COLUMNEND )
    hb_xfree( ( void * ) hb_parptr( 1 ) );
 }
 
-HB_FUNC( LV_DELETECOLUMN )
+HB_FUNC( LV_DELETECOLUMN )                       // ok
 {
    #ifndef _WIN64
       HWND hWnd = ( HWND ) hb_parnl( 1 );
@@ -472,7 +477,7 @@ HB_FUNC( LV_DELETECOLUMN )
 }
 
 // LV_ENSUREVISIBLE( hWnd, nItem, lPart)
-HB_FUNC( LV_ENSUREVISIBLE)
+HB_FUNC( LV_ENSUREVISIBLE)                       // ok
 {
    BOOL lEnablePartialView = HB_ISLOG (3) ? hb_parl (3) : TRUE;
    #ifndef _WIN64
@@ -483,7 +488,7 @@ HB_FUNC( LV_ENSUREVISIBLE)
    ListView_EnsureVisible( hWnd, hb_parni(2)-1 , lEnablePartialView ) ;
 }
 
-HB_FUNC( LV_GETBKCOLOR )
+HB_FUNC( LV_GETBKCOLOR )                         // ok
 {
    #ifndef _WIN64
       HWND hWnd = ( HWND ) hb_parnl( 1 );
@@ -493,7 +498,19 @@ HB_FUNC( LV_GETBKCOLOR )
    hb_retnl ( ListView_GetBkColor ( hWnd ) ) ;
 }
 
-HB_FUNC( LV_GETCOUNTPERPAGE )
+// LV_GETCHECKSTATE (hWnd, nRow)
+HB_FUNC( LV_GETCHECKSTATE)
+{
+   #ifndef _WIN64
+      HWND hWnd = ( HWND ) hb_parnl( 1 );
+   #else
+      HWND hWnd = ( HWND ) hb_parnll( 1 );
+   #endif
+   UINT nRow   = (UINT) hb_parnl (2);
+   hb_retl ( ListView_GetCheckState(hWnd, nRow-1) );
+}
+
+HB_FUNC( LV_GETCOUNTPERPAGE )                    // ok
 {
    #ifndef _WIN64
       HWND hWnd = ( HWND ) hb_parnl( 1 );
@@ -503,7 +520,19 @@ HB_FUNC( LV_GETCOUNTPERPAGE )
    hb_retnl ( ListView_GetCountPerPage ( hWnd ) ) ;
 }
 
-HB_FUNC( LV_GETITEMSTATE )
+// LV_GETCOLUMNWIDTH(hWnd, nCol)                 // nCol = Zero-based
+HB_FUNC( LV_GETCOLUMNWIDTH )                     // ok
+{
+   #ifndef _WIN64
+      HWND hGrid = ( HWND ) hb_parnl( 1 );
+   #else
+      HWND hGrid = ( HWND ) hb_parnll( 1 );
+   #endif
+   hb_retni ( ListView_GetColumnWidth ( hGrid, hb_parni(2) ) ) ;
+}
+
+
+HB_FUNC( LV_GETITEMSTATE )                       // ok
 {
    #ifndef _WIN64
       HWND hWnd = ( HWND ) hb_parnl( 1 );
@@ -517,7 +546,7 @@ HB_FUNC( LV_GETITEMSTATE )
 }
 
 // LV_GETITEMTEXT (ControlHandle, nRow, nCol)
-HB_FUNC( LV_GETITEMTEXT )
+HB_FUNC( LV_GETITEMTEXT )                        // ok
 {
    TCHAR buffer [1024] ;
    LV_ITEM lvi;
@@ -528,7 +557,7 @@ HB_FUNC( LV_GETITEMTEXT )
       HWND hWnd = ( HWND ) hb_parnll( 1 );
    #endif
 
-   lvi.mask = LVIF_TEXT | LVIF_IMAGE;
+   lvi.mask = LVIF_TEXT | LVIF_IMAGE | LVIF_DI_SETITEM ;
    lvi.state = 0;
    lvi.stateMask = 0;
    lvi.iItem = hb_parni( 2 ) - 1;
@@ -543,8 +572,38 @@ HB_FUNC( LV_GETITEMTEXT )
    hb_retc (lvi.pszText);
 }
 
+// LV_GETITEMCOUNT(hWnd)
+HB_FUNC( LV_GETITEMCOUNT )                       // ok
+{
+   #ifndef _WIN64
+      HWND hWnd = ( HWND ) hb_parnl( 1 );
+   #else
+      HWND hWnd = ( HWND ) hb_parnll( 1 );
+   #endif
+   hb_retnl ( ListView_GetItemCount ( hWnd ) ) ;
+}
+
+// LV_GETGRIDDISPINFOINDEX(nPtrNMHDR)
+HB_FUNC( LV_GETGRIDDISPINFOINDEX )               // ok
+{
+   #ifndef _WIN64
+      LPARAM lParam = (LPARAM) hb_parnl (1);
+   #else
+      LPARAM lParam = (LPARAM) hb_parnll (1);
+   #endif
+
+   LV_DISPINFO * pDispInfo = ( LV_DISPINFO * ) lParam;
+   int iItem = pDispInfo->item.iItem;
+   int iSubItem = pDispInfo->item.iSubItem;
+
+   hb_reta( 2 );
+   hb_storvni( iItem    + 1, -1, 1 );
+   hb_storvni( iSubItem + 1, -1, 2 );
+}
+
+
 // LV_GETGRIDVKEY( nPtrNMHDR )
-HB_FUNC( LV_GETGRIDVKEY )
+HB_FUNC( LV_GETGRIDVKEY )                        // ok
 {
    #ifndef _WIN64
       LPARAM lParam = (LPARAM) hb_parnl (1);
@@ -555,7 +614,7 @@ HB_FUNC( LV_GETGRIDVKEY )
    hb_retni ( LVK->wVKey );
 }
 
-HB_FUNC( LV_GETGRIDCOLUMN )
+HB_FUNC( LV_GETGRIDCOLUMN )                      // ok
 {
    #ifndef _WIN64
       LPARAM lParam = (LPARAM) hb_parnl (1);
@@ -568,7 +627,31 @@ HB_FUNC( LV_GETGRIDCOLUMN )
    hb_retni ( NMLV->iSubItem );
 }
 
-HB_FUNC( LV_GETNEXTITEM )
+// LV_GETHEADER( hWnd )
+HB_FUNC( LV_GETHEADER )                          // ok
+{
+   #ifndef _WIN64
+      HWND hGrid = ( HWND ) hb_parnl( 1 );
+   #else
+      HWND hGrid = ( HWND ) hb_parnll( 1 );
+   #endif
+
+   hb_retnll( ( LONG_PTR ) ListView_GetHeader( hGrid ) );
+}
+
+HB_FUNC( LV_GETHEADERLISTVIEWITEM )              // ok
+{
+   #ifndef _WIN64
+      LPNMHEADER lpnmheader = ( LPNMHEADER ) hb_parnl( 1 );
+   #else
+      LPNMHEADER lpnmheader = ( LPNMHEADER ) hb_parnll( 1 );
+   #endif
+
+   hb_retnll( lpnmheader->iItem );
+}
+
+
+HB_FUNC( LV_GETNEXTITEM )                        // ok
 {
    #ifndef _WIN64
       HWND hWnd = ( HWND ) hb_parnl( 1 );
@@ -578,7 +661,7 @@ HB_FUNC( LV_GETNEXTITEM )
    hb_retni( ListView_GetNextItem( hWnd, (int) (hb_parni(2)-1) , LVNI_ALL | LVNI_SELECTED ) + 1 );
 }
 
-HB_FUNC( LV_GETSELECTEDCOUNT )
+HB_FUNC( LV_GETSELECTEDCOUNT )                   // ok
 {
    #ifndef _WIN64
       HWND hWnd = ( HWND ) hb_parnl( 1 );
@@ -592,7 +675,7 @@ HB_FUNC( LV_GETSELECTEDCOUNT )
    #endif
 }
 
-HB_FUNC( LV_GETSELECTIONMARK )
+HB_FUNC( LV_GETSELECTIONMARK )                   // ok
 {
    #ifndef _WIN64
       HWND hWnd = ( HWND ) hb_parnl( 1 );
@@ -606,7 +689,7 @@ HB_FUNC( LV_GETSELECTIONMARK )
    #endif
 }
 
-HB_FUNC( LV_GETTEXTCOLOR )
+HB_FUNC( LV_GETTEXTCOLOR )                       // ok
 {
    #ifndef _WIN64
       HWND hWnd = ( HWND ) hb_parnl( 1 );
@@ -616,7 +699,7 @@ HB_FUNC( LV_GETTEXTCOLOR )
    hb_retnl ( ListView_GetTextColor ( hWnd ) ) ;
 }
 
-HB_FUNC( LV_GETTOPINDEX )
+HB_FUNC( LV_GETTOPINDEX )                        // ok
 {
    #ifndef _WIN64
       HWND hWnd = ( HWND ) hb_parnl( 1 );
@@ -626,7 +709,7 @@ HB_FUNC( LV_GETTOPINDEX )
    hb_retnl ( ListView_GetTopIndex ( hWnd ) ) ;
 }
 
-HB_FUNC( LV_GETSUBITEMRECT )
+HB_FUNC( LV_GETSUBITEMRECT )                     // ok
 {
    RECT Rect;
    #ifndef _WIN64
@@ -653,7 +736,7 @@ HB_FUNC( LV_GETSUBITEMRECT )
    hb_storvni( Rect.bottom - Rect.top  , -1, 4 );
 }
 
-HB_FUNC( LV_GETITEMRECT )
+HB_FUNC( LV_GETITEMRECT )                        // ok
 {
    RECT Rect ;
    #ifndef _WIN64
@@ -678,7 +761,60 @@ HB_FUNC( LV_GETITEMRECT )
    hb_storvni( Rect.bottom - Rect.top  , -1, 4 );
 }
 
-HB_FUNC( LV_HIDEWINDOW )
+// ListView_GetExtendedStyle ( hWnd, [ nExStyle ] )
+HB_FUNC( LV_GETEXTENDEDSTYLE )                   // ok
+{
+   #ifndef _WIN64
+      HWND hWnd = ( HWND ) hb_parnl( 1 );
+   #else
+      HWND hWnd = ( HWND ) hb_parnll( 1 );
+   #endif
+   DWORD ExStyle  = (DWORD) hb_parnl  (2);
+   DWORD OldStyle = ListView_GetExtendedListViewStyle (hWnd);
+   if ( HB_ISNUM(2) )
+      hb_retl ((BOOL) ((OldStyle & ExStyle) == ExStyle));
+   else
+      hb_retnl ((LONG) OldStyle);
+}
+
+
+HB_FUNC( LV_GETGRIDROW )                         // ok
+{
+   #ifndef _WIN64
+      LPARAM lParam = (LPARAM) hb_parnl (1);
+   #else
+      LPARAM lParam = (LPARAM) hb_parnll (1);
+   #endif
+   NM_LISTVIEW * NMLV = (NM_LISTVIEW *) lParam;
+   hb_retni ( NMLV->iItem );
+}
+
+
+HB_FUNC( LV_GETGRIDOLDSTATE )                    // ok
+{
+   #ifndef _WIN64
+      LPARAM lParam = (LPARAM) hb_parnl (1);
+   #else
+      LPARAM lParam = (LPARAM) hb_parnll (1);
+   #endif
+   NM_LISTVIEW * NMLV = (NM_LISTVIEW *) lParam;
+   hb_retni ( NMLV->uOldState );
+}
+
+
+HB_FUNC( LV_GETGRIDNEWSTATE )                    // ok
+{
+   #ifndef _WIN64
+      LPARAM lParam = (LPARAM) hb_parnl (1);
+   #else
+      LPARAM lParam = (LPARAM) hb_parnll (1);
+   #endif
+   NM_LISTVIEW * NMLV = (NM_LISTVIEW *) lParam;
+   hb_retni ( NMLV->uNewState );
+}
+
+
+HB_FUNC( LV_HIDEWINDOW )                         // ok
 {
    #ifndef _WIN64
       HWND hWnd = ( HWND ) hb_parnl( 1 );
@@ -688,7 +824,7 @@ HB_FUNC( LV_HIDEWINDOW )
    hb_retnl( ShowWindow(hWnd, SW_HIDE) );
 }
 
-HB_FUNC( LV_HITTEST )
+HB_FUNC( LV_HITTEST )                            // ok
 {
 
    POINT point ;
@@ -704,7 +840,8 @@ HB_FUNC( LV_HITTEST )
 
    lvhti.pt = point;
 
-   ListView_SubItemHitTest ( hWnd, &lvhti ) ;
+//   ListView_SubItemHitTest ( hWnd, &lvhti ) ;
+   ListView_HitTest(hWnd, &lvhti ) ;
 
    if(lvhti.flags & LVHT_ONITEM)
    {
@@ -720,7 +857,8 @@ HB_FUNC( LV_HITTEST )
    }
 }
 
-HB_FUNC( LV_INSERTCOLUMN )
+// LV_INSERTCOLUMN( hWnd, nSubItem, nWeight, cText, nFMT )
+HB_FUNC( LV_INSERTCOLUMN )                       // ok
 {
    #ifndef _WIN64
       HWND hWnd = ( HWND ) hb_parnl( 1 );
@@ -730,17 +868,32 @@ HB_FUNC( LV_INSERTCOLUMN )
 
    LV_COLUMN COL;
 
-   COL.mask= LVCF_WIDTH | LVCF_TEXT | LVCF_FMT | LVCF_SUBITEM ;
+   COL.mask= LVCF_WIDTH | LVCF_TEXT | LVCF_FMT | LVCF_SUBITEM | LVCF_IMAGE ;
+//   | LVCF_IMAGE ;
    COL.cx= hb_parni(3);
    COL.pszText = (TCHAR*) hb_parc(4);
    COL.iSubItem=hb_parni(2)-1;
    COL.fmt = hb_parni(5) ;
+   COL.iImage = hb_parni(6);
 
    ListView_InsertColumn ( hWnd, hb_parni(2)-1, &COL );
 
 }
 
-HB_FUNC( LV_REDRAWITEMS )
+
+HB_FUNC( LV_INITCOMMON )                         // ok
+{
+   INITCOMMONCONTROLSEX i;
+
+   memset( ( char * ) &i, 0, sizeof( INITCOMMONCONTROLSEX ) );
+
+   i.dwSize = sizeof( INITCOMMONCONTROLSEX );
+   i.dwICC  = ICC_LISTVIEW_CLASSES;
+
+}
+
+
+HB_FUNC( LV_REDRAWITEMS )                        // ok
 {
    #ifndef _WIN64
       HWND hWnd = ( HWND ) hb_parnl( 1 );
@@ -751,7 +904,7 @@ HB_FUNC( LV_REDRAWITEMS )
 }
 
 // LV_Scroll ( hWnd, nDx, nDy )
-HB_FUNC( LV_SCROLL )
+HB_FUNC( LV_SCROLL )                             // ok
 {
    #ifndef _WIN64
       HWND hWnd = ( HWND ) hb_parnl( 1 );
@@ -761,7 +914,7 @@ HB_FUNC( LV_SCROLL )
    ListView_Scroll( hWnd, hb_parni(2), hb_parni(3) ) ;
 }
 
-HB_FUNC( LV_SETBKCOLOR )
+HB_FUNC( LV_SETBKCOLOR )                         // ok
 {
    #ifndef _WIN64
       HWND hWnd = ( HWND ) hb_parnl( 1 );
@@ -772,7 +925,7 @@ HB_FUNC( LV_SETBKCOLOR )
 }
 
 // LV_SETITEMCOUNT( hWnd, nMax )
-HB_FUNC( LV_SETITEMCOUNT )
+HB_FUNC( LV_SETITEMCOUNT )                       // ok
 {
    #ifndef _WIN64
       HWND hWnd = ( HWND ) hb_parnl( 1 );
@@ -789,7 +942,7 @@ HB_FUNC( LV_SETITEMCOUNT )
 }
 
 // LV_SETITEMSELECT( hWnd, nPosi )
-HB_FUNC( LV_SETITEMSELECT )
+HB_FUNC( LV_SETITEMSELECT )                      // ok
 {
    #ifndef _WIN64
       HWND hWnd = ( HWND ) hb_parnl( 1 );
@@ -802,7 +955,7 @@ HB_FUNC( LV_SETITEMSELECT )
    ListView_SetItemState( hWnd, hb_parnl( 2 ) -1, ( LVIS_SELECTED | LVIS_FOCUSED ), ( LVIS_SELECTED | LVIS_FOCUSED ) );
 }
 
-HB_FUNC( LV_SETITEMSTATE)
+HB_FUNC( LV_SETITEMSTATE)                        // ok
 {
    #ifndef _WIN64
       HWND hWnd = ( HWND ) hb_parnl( 1 );
@@ -812,7 +965,7 @@ HB_FUNC( LV_SETITEMSTATE)
    ListView_SetItemState( hWnd, (int) (hb_parni(2)-1) , hb_parni(3) , hb_parni(4) );
 }
 
-HB_FUNC( LV_SETTEXTBKCOLOR )
+HB_FUNC( LV_SETTEXTBKCOLOR )                     // ok
 {
    #ifndef _WIN64
       HWND hWnd = ( HWND ) hb_parnl( 1 );
@@ -822,7 +975,7 @@ HB_FUNC( LV_SETTEXTBKCOLOR )
    ListView_SetTextBkColor ( hWnd, (COLORREF) RGB(hb_parni(2), hb_parni(3), hb_parni(4)) ) ;
 }
 
-HB_FUNC( LV_SETTEXTCOLOR )
+HB_FUNC( LV_SETTEXTCOLOR )                       // ok
 {
    #ifndef _WIN64
       HWND hWnd = ( HWND ) hb_parnl( 1 );
@@ -833,7 +986,7 @@ HB_FUNC( LV_SETTEXTCOLOR )
 }
 
 // LV_SetItemText (hWnd, aItem, nRow)
-HB_FUNC( LV_SETITEMTEXT )
+HB_FUNC( LV_SETITEMTEXT )                        // ok
 {
    #ifndef _WIN64
       HWND hWnd = ( HWND ) hb_parnl( 1 );
@@ -853,7 +1006,7 @@ HB_FUNC( LV_SETITEMTEXT )
 }
 
 // LV_SHOWWINDOW(hWnd)
-HB_FUNC( LV_SHOWWINDOW )
+HB_FUNC( LV_SHOWWINDOW )                         // ok
 {
    #ifndef _WIN64
       HWND hWnd = ( HWND ) hb_parnl( 1 );
@@ -863,46 +1016,77 @@ HB_FUNC( LV_SHOWWINDOW )
    hb_retnl( ShowWindow(hWnd, SW_SHOW) );
 }
 
-HB_FUNC( LV_UPDATE )
+
+
+//        LV_SetHeaderImageIndex (hWnd, nCol, nIndex)
+HB_FUNC( LV_SETHEADERIMAGEINDEX )                // ok
 {
    #ifndef _WIN64
       HWND hWnd = ( HWND ) hb_parnl( 1 );
    #else
       HWND hWnd = ( HWND ) hb_parnll( 1 );
    #endif
-   hb_retnl( ListView_Update ( hWnd, hb_parni(2) - 1 ) );
+   INT  nCol    = (INT)  hb_parni  (2);
+   INT  nIndex  = (INT)  hb_parni  (3);
+   LV_COLUMN LVC;
+   LVC.mask   = LVCF_FMT | LVCF_IMAGE;
+   LVC.iImage = nIndex;
+   LVC.fmt    = LVCFMT_IMAGE /*| LVCFMT_COL_HAS_IMAGES*/;
+   ListView_SetColumn (hWnd, nCol , &LVC);
 }
 
-// LV_GETITEMCOUNT(hWnd)
-HB_FUNC( LV_GETITEMCOUNT )
-{
-   #ifndef _WIN64
-      HWND hWnd = ( HWND ) hb_parnl( 1 );
-   #else
-      HWND hWnd = ( HWND ) hb_parnll( 1 );
-   #endif
-   hb_retnl ( ListView_GetItemCount ( hWnd ) ) ;
-}
-
-HB_FUNC( LV_INITCOMMON )
-{
-   INITCOMMONCONTROLSEX i;
-
-   memset( ( char * ) &i, 0, sizeof( INITCOMMONCONTROLSEX ) );
-
-   i.dwSize = sizeof( INITCOMMONCONTROLSEX );
-   i.dwICC  = ICC_LISTVIEW_CLASSES;
-
-}
-
-// ListView_SetSortHeader ( nHWndLV, nColumn [, nType
+// ListView_SetSortHeaderAll ( nHWndLV, nColumn , nType, hIcon )
 //  /*0==none, positive==UP arrow or negative==DOWN arrow*/] ) -> nType (previous setting)
-HB_FUNC( LV_SETSORTHEADER )
+HB_FUNC( LV_SETSORTHEADERDLL )                   // ok
 {
    #ifndef _WIN64
-      HWND hWndHD = ListView_GetHeader( ( HWND ) hb_parnl( 1 ) ) ;
+      HWND hWndHD = ( HWND ) SendMessage( ( HWND ) hb_parnl( 1 ), LVM_GETHEADER, 0, 0 );
    #else
-      HWND hWndHD = ListView_GetHeader( ( HWND ) hb_parnll( 1 ) ) ;
+      HWND hWndHD = ( HWND ) SendMessage( ( HWND ) hb_parnll( 1 ), LVM_GETHEADER, 0, 0 );
+   #endif
+   INT    nItem  = hb_parni( 2 ) - 1;
+   INT    nType;
+   HDITEM hdItem;
+
+   {
+      hdItem.mask = HDI_IMAGE | HDI_FORMAT;
+
+      SendMessage( hWndHD, HDM_GETITEM, nItem, ( LPARAM ) &hdItem );
+
+      nType = hb_parni( 3 );
+
+      if( nType == 0 )
+      {
+         hdItem.mask = HDI_FORMAT;
+         hdItem.fmt &= ~( HDF_IMAGE | HDF_BITMAP_ON_RIGHT );
+      }
+      else
+      {
+         if( nType > 0 )
+            hdItem.hbm = (HBITMAP) hb_parnll(4) ;
+         else
+            hdItem.hbm = ( HBITMAP ) hb_parnll(4) ;
+
+         hdItem.fmt |= HDF_IMAGE ;
+         if( hdItem.fmt & HDF_RIGHT )
+            hdItem.fmt &= ~HDF_BITMAP_ON_RIGHT;
+         else
+            hdItem.fmt |= HDF_BITMAP_ON_RIGHT;
+      }
+
+      SendMessage( hWndHD, HDM_SETITEM, nItem, ( LPARAM ) &hdItem );
+   }
+}
+
+
+// ListView_SetSortHeaderIco ( nHWndLV, nColumn [, nType
+//  /*0==none, positive==UP arrow or negative==DOWN arrow*/] ) -> nType (previous setting)
+HB_FUNC( LV_SETSORTHEADERICO )                   // ok
+{
+   #ifndef _WIN64
+      HWND hWndHD = ( HWND ) SendMessage( ( HWND ) hb_parnl( 1 ), LVM_GETHEADER, 0, 0 );
+   #else
+      HWND hWndHD = ( HWND ) SendMessage( ( HWND ) hb_parnll( 1 ), LVM_GETHEADER, 0, 0 );
    #endif
    INT    nItem  = hb_parni( 2 ) - 1;
    INT    nType;
@@ -937,7 +1121,7 @@ HB_FUNC( LV_SETSORTHEADER )
    }
    else
    {
-      hdItem.mask = HDI_BITMAP | HDI_FORMAT;
+      hdItem.mask = HDI_IMAGE | HDI_FORMAT;
 
       SendMessage( hWndHD, HDM_GETITEM, nItem, ( LPARAM ) &hdItem );
 
@@ -946,16 +1130,16 @@ HB_FUNC( LV_SETSORTHEADER )
       if( nType == 0 )
       {
          hdItem.mask = HDI_FORMAT;
-         hdItem.fmt &= ~( HDF_BITMAP | HDF_BITMAP_ON_RIGHT );
+         hdItem.fmt &= ~( HDF_IMAGE | HDF_BITMAP_ON_RIGHT );
       }
       else
       {
          if( nType > 0 )
-            hdItem.hbm = ( HBITMAP ) LoadImage( ( HINSTANCE ) NULL, TEXT( "GRID_ASC" ), IMAGE_BITMAP, 0, 0, LR_LOADTRANSPARENT | LR_DEFAULTCOLOR | LR_LOADMAP3DCOLORS );
+            hdItem.hbm = ( HBITMAP ) LoadImage( ( HINSTANCE ) NULL, TEXT( "ICOUP" )   ,   IMAGE_ICON, 0, 0, LR_LOADTRANSPARENT | LR_DEFAULTCOLOR | LR_LOADMAP3DCOLORS | LR_COPYFROMRESOURCE );
          else
-            hdItem.hbm = ( HBITMAP ) LoadImage( ( HINSTANCE ) NULL, TEXT( "GRID_DSC" ), IMAGE_BITMAP, 0, 0, LR_LOADTRANSPARENT | LR_DEFAULTCOLOR | LR_LOADMAP3DCOLORS );
+            hdItem.hbm = ( HBITMAP ) LoadImage( ( HINSTANCE ) NULL, TEXT( "ICONDOWN" ),   IMAGE_ICON, 0, 0, LR_LOADTRANSPARENT | LR_DEFAULTCOLOR | LR_LOADMAP3DCOLORS | LR_COPYFROMRESOURCE );
 
-         hdItem.fmt |= HDF_BITMAP;
+         hdItem.fmt |= HDF_IMAGE ;
          if( hdItem.fmt & HDF_RIGHT )
             hdItem.fmt &= ~HDF_BITMAP_ON_RIGHT;
          else
@@ -966,31 +1150,8 @@ HB_FUNC( LV_SETSORTHEADER )
    }
 }
 
-// LV_GETHEADER( hWnd )
-HB_FUNC( LV_GETHEADER )
-{
-   #ifndef _WIN64
-      HWND hGrid = ( HWND ) hb_parnl( 1 );
-   #else
-      HWND hGrid = ( HWND ) hb_parnll( 1 );
-   #endif
-
-   hb_retnll( ( LONG_PTR ) ListView_GetHeader( hGrid ) );
-}
-
-HB_FUNC( LV_GETHEADERLISTVIEWITEM )
-{
-   #ifndef _WIN64
-      LPNMHEADER lpnmheader = ( LPNMHEADER ) hb_parnl( 1 );
-   #else
-      LPNMHEADER lpnmheader = ( LPNMHEADER ) hb_parnll( 1 );
-   #endif
-
-   hb_retnll( lpnmheader->iItem );
-}
-
 // LV_GETCOLUMNWIDTH(hWnd, nCol, nwide)          // nCol = Zero-based
-HB_FUNC( LV_SETCOLUMNWIDTH )
+HB_FUNC( LV_SETCOLUMNWIDTH )                     // ok
 {
    #ifndef _WIN64
       HWND hGrid = ( HWND ) hb_parnl( 1 );
@@ -1000,19 +1161,9 @@ HB_FUNC( LV_SETCOLUMNWIDTH )
    ListView_SetColumnWidth ( hGrid, hb_parni(2) , hb_parni(3) ) ;
 }
 
-// LV_GETCOLUMNWIDTH(hWnd, nCol)                 // nCol = Zero-based
-HB_FUNC( LV_GETCOLUMNWIDTH )
-{
-   #ifndef _WIN64
-      HWND hGrid = ( HWND ) hb_parnl( 1 );
-   #else
-      HWND hGrid = ( HWND ) hb_parnll( 1 );
-   #endif
-   hb_retni ( ListView_GetColumnWidth ( hGrid, hb_parni(2) ) ) ;
-}
 
 // LV_SETCHECKSTATE (hWnd, nRow, lCheck)
-HB_FUNC( LV_SETCHECKSTATE)
+HB_FUNC( LV_SETCHECKSTATE)                       // ok
 {
    #ifndef _WIN64
       HWND hWnd = ( HWND ) hb_parnl( 1 );
@@ -1025,38 +1176,8 @@ HB_FUNC( LV_SETCHECKSTATE)
    ListView_SetCheckState (hWnd, nRow-1, lCheck);
 }
 
-// LV_GETCHECKSTATE (hWnd, nRow)
-HB_FUNC( LV_GETCHECKSTATE)
-{
-   #ifndef _WIN64
-      HWND hWnd = ( HWND ) hb_parnl( 1 );
-   #else
-      HWND hWnd = ( HWND ) hb_parnll( 1 );
-   #endif
-   UINT nRow   = (UINT) hb_parnl (2);
-   hb_retl ( ListView_GetCheckState(hWnd, nRow-1) );
-}
-
-// LV_GETGRIDDISPINFOINDEX(nPtrNMHDR)
-HB_FUNC( LV_GETGRIDDISPINFOINDEX )
-{
-   #ifndef _WIN64
-      LPARAM lParam = (LPARAM) hb_parnl (1);
-   #else
-      LPARAM lParam = (LPARAM) hb_parnll (1);
-   #endif
-
-   LV_DISPINFO * pDispInfo = ( LV_DISPINFO * ) lParam;
-   int iItem = pDispInfo->item.iItem;
-   int iSubItem = pDispInfo->item.iSubItem;
-
-   hb_reta( 2 );
-   hb_storvni( iItem    + 1, -1, 1 );
-   hb_storvni( iSubItem + 1, -1, 2 );
-}
-
 // LV_SETGRIDQUERYDATA(nPtrNMHDR)
-HB_FUNC( LV_SETGRIDQUERYDATA )
+HB_FUNC( LV_SETGRIDQUERYDATA )                   // ok
 {
    #ifndef _WIN64
       LPARAM lParam = ( LPARAM ) hb_parnl( 1 );
@@ -1077,7 +1198,7 @@ HB_FUNC( LV_SETGRIDQUERYDATA )
 }
 
 // LV_SETGRIDQUERYIMAGE(nPtrNMHDR)
-HB_FUNC( LV_SETGRIDQUERYIMAGE )
+HB_FUNC( LV_SETGRIDQUERYIMAGE )                  // ok
 {
    #ifndef _WIN64
       LPARAM lParam = ( LPARAM ) hb_parnl( 1 );
@@ -1090,20 +1211,273 @@ HB_FUNC( LV_SETGRIDQUERYIMAGE )
 }
 
 
-// ListView_GetExtendedStyle ( hWnd, [ nExStyle ] )
-HB_FUNC( LV_GETEXTENDEDSTYLE )
+HB_FUNC( LV_SETCHECKITEM )                       // ok
+{
+   #ifndef _WIN64
+      LPARAM lParam = ( LPARAM ) hb_parnl( 1 );
+   #else
+      LPARAM lParam = ( LPARAM ) hb_parnll( 1 );
+   #endif
+   LV_DISPINFO * pDispInfo = ( LV_DISPINFO * ) lParam;
+
+   //Create a pointer to the item
+   LV_ITEM* pItem= &(pDispInfo)->item;
+
+   //To enable check box, we have to enable state mask...
+   pItem->mask |= LVIF_STATE;
+   pItem->stateMask = LVIS_STATEIMAGEMASK;
+
+   pItem->state = INDEXTOSTATEIMAGEMASK( hb_parni( 2 ) );
+   //pItem->state = INDEXTOSTATEIMAGEMASK( 2 );
+
+}
+
+HB_FUNC( LV_UPDATE )                             // ok
 {
    #ifndef _WIN64
       HWND hWnd = ( HWND ) hb_parnl( 1 );
    #else
       HWND hWnd = ( HWND ) hb_parnll( 1 );
    #endif
-   DWORD ExStyle  = (DWORD) hb_parnl  (2);
-   DWORD OldStyle = ListView_GetExtendedListViewStyle (hWnd);
-   if ( HB_ISNUM(2) )
-      hb_retl ((BOOL) ((OldStyle & ExStyle) == ExStyle));
+   hb_retnl( ListView_Update ( hWnd, hb_parni(2) - 1 ) );
+}
+
+
+//        ListView_SetItemImageIndex ( hWnd , nRow , nCol, [ nImageIndex ] )
+HB_FUNC( LV_SETITEMIMAGEINDEX )                  // ok
+{
+   #ifndef _WIN64
+      HWND hWnd = ( HWND ) hb_parnl( 1 );
+   #else
+      HWND hWnd = ( HWND ) hb_parnll( 1 );
+   #endif
+   int nRow   = (int)  hb_parni  (2);
+   int nCol   = (int)  hb_parni  (3);   // LVM_SETEXTENDEDLISTVIEWSTYLE with LVS_EX_SUBITEMIMAGES
+   int iImage = HB_ISNIL(4) ? -1 : hb_parni (4);
+
+   LV_ITEM LV;
+   LV.mask      = LVIF_IMAGE;
+   LV.state     = 0;
+   LV.stateMask = 0;
+   LV.iImage    = iImage;
+   LV.iSubItem  = nCol;
+   LV.iItem     = nRow;
+
+   ListView_SetItem (hWnd, &LV);
+}
+
+
+HB_FUNC( LV_INITLISTVIEW )                       // ok
+{
+   HWND hwnd;
+   HWND hbutton;
+   int  style;
+
+   INITCOMMONCONTROLSEX i;
+
+   i.dwSize = sizeof( INITCOMMONCONTROLSEX );
+   i.dwICC  = ICC_LISTVIEW_CLASSES;
+   InitCommonControlsEx( &i );
+
+   hwnd = ( HWND ) hb_parnll( 1 );
+
+   style = LVS_SHOWSELALWAYS | WS_CHILD | WS_VISIBLE | LVS_REPORT;
+
+   if( ! hb_parl( 9 ) )
+      style = style | LVS_SINGLESEL;
+
+   if( ! hb_parl( 12 ) )
+      style = style | WS_TABSTOP;
+
+   if( ! hb_parl( 10 ) )
+      style = style | LVS_NOCOLUMNHEADER;
+   else if( hb_parl( 11 ) )
+      style = style | LVS_NOSORTHEADER;
+
+   if( hb_parl( 7 ) )
+      style = style | LVS_OWNERDATA;
+
+   hbutton = CreateWindowEx
+             (
+      WS_EX_CLIENTEDGE,
+      WC_LISTVIEW,
+      TEXT( "" ),
+      style,
+      hb_parni( 3 ),
+      hb_parni( 4 ),
+      hb_parni( 5 ),
+      hb_parni( 6 ),
+      hwnd,
+      ( HMENU ) hb_parnll( 2 ),
+      GetModuleHandle(NULL),
+      NULL
+             );
+
+   if( hb_parl( 7 ) )
+      ListView_SetItemCount( hbutton, hb_parni( 8 ) );
+
+   hb_retnll( ( LONG_PTR ) hbutton );
+}
+
+
+//********************************************************************************************************
+// ListView Custom Draw
+//********************************************************************************************************
+
+
+//        Header_SetFont
+HB_FUNC( HEADER_SETFONT )                        // ok
+{
+   #ifndef _WIN64
+      LPARAM lParam = (LPARAM) hb_parnl (1);
+   #else
+      LPARAM lParam = (LPARAM) hb_parnll (1);
+   #endif
+   LPNMCUSTOMDRAW lpNMCustomDraw = (LPNMCUSTOMDRAW) lParam;
+   HFONT hFont = (HFONT) hb_parnll (4);
+
+//   SetBkMode    (lpNMCustomDraw->hdc, OPAQUE);
+   SetBkColor   (lpNMCustomDraw->hdc, hb_parni(2));   // Not work
+   SetTextColor (lpNMCustomDraw->hdc, hb_parni(3));
+
+   if ( hFont != NULL )
+       SelectObject (lpNMCustomDraw->hdc, hFont);
+
+   hb_retni ( CDRF_NEWFONT );
+}
+
+//        Header_SetColor
+HB_FUNC( HEADER_SETCOLOR )
+{
+   #ifndef _WIN64
+      LPARAM lParam = (LPARAM) hb_parnl (1);
+   #else
+      LPARAM lParam = (LPARAM) hb_parnll (1);
+   #endif
+   LPNMCUSTOMDRAW lpNMCustomDraw = (LPNMCUSTOMDRAW) lParam;
+   HBRUSH hbrush;
+   RECT rect = lpNMCustomDraw->rc ;
+
+   SetBkColor   (lpNMCustomDraw->hdc, hb_parni(2));
+   SetTextColor (lpNMCustomDraw->hdc, hb_parni(3));
+
+   hbrush = CreateSolidBrush( hb_parni(2) );
+   SetBkMode( lpNMCustomDraw->hdc, 1 );
+   SelectObject( lpNMCustomDraw->hdc, hbrush);
+   FillRect(lpNMCustomDraw->hdc, &rect , hbrush);
+   DeleteObject(hbrush);
+
+   hb_retni ( CDRF_NEWFONT );
+}
+
+//        Header_CustomDraw_GetItem ( lParam ) --> nColumnHeader
+HB_FUNC( HEADER_CUSTOMDRAW_GETITEM )
+{
+   #ifndef _WIN64
+      LPARAM lParam = (LPARAM) hb_parnl (1);
+   #else
+      LPARAM lParam = (LPARAM) hb_parnll (1);
+   #endif
+   LPNMCUSTOMDRAW lpNMCustomDraw = (LPNMCUSTOMDRAW) lParam;
+   hb_retnll( ( LONG_PTR ) lpNMCustomDraw->dwItemSpec );
+}
+
+//        Header_CustomDraw_GetAction ( lParam )
+HB_FUNC( HEADER_CUSTOMDRAW_GETACTION )
+{
+   #ifndef _WIN64
+      LPARAM lParam = (LPARAM) hb_parnl (1);
+   #else
+      LPARAM lParam = (LPARAM) hb_parnll (1);
+   #endif
+   LPNMCUSTOMDRAW lpNMCustomDraw = (LPNMCUSTOMDRAW) lParam;
+
+   if ( lpNMCustomDraw->dwDrawStage == CDDS_PREPAINT )
+       hb_retni ( CDRF_NOTIFYITEMDRAW ) ;
+   else if ( lpNMCustomDraw->dwDrawStage == CDDS_ITEMPREPAINT )   // not work in 64-bits, never dwDrawStage == CDDS_ITEMPREPAINT ???
+        hb_retni ( -1 ) ;   // Change font, forecolor , backcolor
    else
-      hb_retnl ((LONG) OldStyle);
+      hb_retni ( CDRF_DODEFAULT ) ;
+}
+
+//        Header_CustomDraw_GetHDC ( lParam ) --> hDC
+HB_FUNC( HEADER_CUSTOMDRAW_GETHDC )
+{
+   #ifndef _WIN64
+      LPARAM lParam = (LPARAM) hb_parnl (1);
+   #else
+      LPARAM lParam = (LPARAM) hb_parnll (1);
+   #endif
+   LPNMCUSTOMDRAW lpNMCustomDraw = (LPNMCUSTOMDRAW) lParam;
+   hb_retnll( ( LONG_PTR ) lpNMCustomDraw->hdc);
+}
+
+//        ListView_CustomDraw_GetHDC ( lParam ) --> hDC
+HB_FUNC( LISTVIEW_CUSTOMDRAW_GETHDC )
+{
+   #ifndef _WIN64
+      LPARAM lParam = (LPARAM) hb_parnl (1);
+   #else
+      LPARAM lParam = (LPARAM) hb_parnll (1);
+   #endif
+   LPNMLVCUSTOMDRAW lplvcd = (LPNMLVCUSTOMDRAW) lParam;
+   hb_retnll( ( LONG_PTR ) lplvcd->nmcd.hdc);
+}
+
+
+//        ListView_CustomDraw_GetAction ( lParam , [ CellNavigation , hWndLV , nIndex ] )
+HB_FUNC( LISTVIEW_CUSTOMDRAW_GETACTION )
+{
+   #ifndef _WIN64
+      LPARAM lParam = (LPARAM) hb_parnl (1);
+   #else
+      LPARAM lParam = (LPARAM) hb_parnll (1);
+   #endif
+   LPNMLVCUSTOMDRAW lplvcd = (LPNMLVCUSTOMDRAW) lParam;
+
+   if (lplvcd->nmcd.dwDrawStage == CDDS_PREPAINT )
+       hb_retni ( CDRF_NOTIFYITEMDRAW ) ;
+
+   else if (lplvcd->nmcd.dwDrawStage == CDDS_ITEMPREPAINT )
+   {
+        if ( hb_parl (2) )   // if CellNavigation == .T.
+        {
+   #ifndef _WIN64
+            HWND hWndLV = (HWND) hb_parnl (3);
+   #else
+            HWND hWndLV = (HWND) hb_parnll (3);
+   #endif
+            INT  nIndex = (INT)  hb_parni  (4) - 1;
+            if ( ListView_GetNextItem (hWndLV, - 1, (LVNI_ALL | LVNI_SELECTED)) == nIndex )
+                ListView_SetItemState(hWndLV, nIndex, 0, LVIS_SELECTED );
+        }
+
+        hb_retni ( CDRF_NOTIFYSUBITEMDRAW ) ;
+   }
+   else if (lplvcd->nmcd.dwDrawStage == (CDDS_SUBITEM | CDDS_ITEMPREPAINT))
+        hb_retni ( -1 ) ;   // Change font, forecolor , backcolor
+   else
+      hb_retni ( CDRF_DODEFAULT ) ;
+}
+
+//        ListView_CustomDraw_GetRowCol ( lParam ) --> { nRow , nCol }
+HB_FUNC( LISTVIEW_CUSTOMDRAW_GETROWCOL )
+{
+   #ifndef _WIN64
+      LPARAM lParam = (LPARAM) hb_parnl (1);
+   #else
+      LPARAM lParam = (LPARAM) hb_parnll (1);
+   #endif
+   LPNMLVCUSTOMDRAW lplvcd = (LPNMLVCUSTOMDRAW) lParam;
+
+   hb_reta( 2 );
+   // nRow draw
+   hb_storvnl( (LONG) lplvcd->nmcd.dwItemSpec + 1 , -1, 1 );   // The item number. What is contained in this member will depend on the type of control
+                                                               // that is sending the notification. See the NM_CUSTOMDRAW notification reference for
+                                                               // the specific control to determine what, if anything, is contained in this member.
+   // nCol draw
+   hb_storvnl( (LONG) lplvcd->iSubItem + 1 , -1, 2 );   // Index of the subitem that is being drawn.
+                                                        // If the main item is being drawn, this member will be zero.
 }
 
 #pragma ENDDUMP

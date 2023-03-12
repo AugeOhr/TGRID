@@ -2,13 +2,13 @@
 *+
 *+ Source Module => c:\fwh\0\LISTVIEW\PROPERTY.PRG
 *+
-*+    Copyright(C) 1983-2022 by Auge & Ohr
+*+    Copyright(C) 1983-2023 by Auge & Ohr
 *+
 *+    Functions: Procedure ShowMoreProperty()
 *+               Static Function GetMetaData()
 *+               Static Function OnlySign()
 *+
-*+    Reformatted by Click! 2.05.40 on Jan-7-2023 at  1:29 am
+*+    Reformatted by Click! 2.05.40 on Mar-11-2023 at  8:22 am
 *+
 *+--------------------------------------------------------------------
 
@@ -56,14 +56,15 @@ LOCAL lDispInfo := .T.
                        BFcolor, BGcolor, lPixel, lDesign, ;
                        800, 800, cMsg, nIcoLarge, nIcoSmall, lChkBoxes, lDispInfo )
 
-      AADD( aHeader, { "No", 080, LVCFMT_LEFT, "C" } )
+      AADD( aHeader, { "No", 100, LVCFMT_LEFT, "C" } )
       AADD( aHeader, { "Description", 250, LVCFMT_LEFT, "C" } )
-      AADD( aHeader, { "Value", 440, LVCFMT_LEFT, "C" } )
+      AADD( aHeader, { "Value", 410, LVCFMT_LEFT, "C" } )
 
       oGrid:aHeader := aHeader
       oGrid:aSource := aMeta
-      // no FileIcon
-      oGrid:lFileIcon := .F.
+
+      // paint Grid_Header
+      oGrid:Use_Customdraw := .T.
 
       oGrid:CreateHeaderColumn()
 

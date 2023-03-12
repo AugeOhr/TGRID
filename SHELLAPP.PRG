@@ -2,7 +2,7 @@
 *+
 *+ Source Module => c:\fwh\0\LISTVIEW\SHELLAPP.PRG
 *+
-*+    Copyright(C) 1983-2022 by Auge & Ohr
+*+    Copyright(C) 1983-2023 by Auge & Ohr
 *+
 *+    Functions: Function SetAttr()
 *+               Function DXE_CreateLink()
@@ -13,13 +13,12 @@
 *+               Procedure FuncSysFolder()
 *+               Static Function WinSysFolder()
 *+
-*+    Reformatted by Click! 2.05.40 on Jan-7-2023 at  1:29 am
+*+    Reformatted by Click! 2.05.40 on Mar-11-2023 at  8:22 am
 *+
 *+--------------------------------------------------------------------
 
 #include "FIVEWIN.CH"
 #include "common.ch"
-#include "Directry.ch"
 #include "fileio.ch"
 #include "dll.ch"
 
@@ -214,7 +213,7 @@ LOCAL aArray := {}
 
    AADD( aArray, { "compmgmt.msc               ", "Computer Verwaltung           ", "Computer administration       ", "ALL" } )
    AADD( aArray, { "devmgmt.msc                ", "Geräte Manager                ", "Device Management             ", "ALL" } )
-   AADD( aArray, { "diskmgmt.msc               ", "Festplatten Verwaltung        ", "Disk management               ", "ALL" } )
+   AADD( aArray, { "diskmgmt.msc               ", "Dateiträger Verwaltung        ", "Disk management               ", "ALL" } )
    AADD( aArray, { "eventvwr.msc               ", "Ereigniss Anzeige             ", "Event display                 ", "ALL" } )
    AADD( aArray, { "services.msc               ", "Dienste                       ", "Services                      ", "ALL" } )
    AADD( aArray, { "wf.msc                     ", "Firewall                      ", "Firewall                      ", "ALL" } )
@@ -269,7 +268,8 @@ LOCAL aArray := {}
    AADD( aArray, { "control.exe printers       ", "Geräte und Drucker            ", "Devices and printers          ", "W7" } )
    AADD( aArray, { "control.exe keyboard       ", "Tastatur Eigenschaften        ", "Keyboard properties           ", "W7" } )
    AADD( aArray, { "explorer.exe ms-settings:windowsupdate", "Windows Update", "Windows Update", "W10" } )
-   AADD( aArray, { "TPM.msc                    ", "TPM Setup", "TPM Setup", "W10" } )
+   AADD( aArray, { "TPM.msc                    ", "TPM Setup                    ", "TPM Setup                      ", "W10" } )
+   AADD( aArray, { "MSINFO32.EXE               ", "System Information           ", "System Information             ", "ALL" } )
 
 RETURN aArray
 
@@ -279,6 +279,7 @@ RETURN aArray
 *+
 *+    Called from ( dualgrid.prg )   1 - procedure main()
 *+                                   1 - static procedure domykey()
+*+                                   1 - static procedure makefnbutton()
 *+
 *+--------------------------------------------------------------------
 *+
@@ -375,6 +376,7 @@ RETURN
 *+
 *+    Called from ( dualgrid.prg )   1 - procedure main()
 *+                                   1 - static procedure domykey()
+*+                                   1 - static procedure makefnbutton()
 *+
 *+--------------------------------------------------------------------
 *+
