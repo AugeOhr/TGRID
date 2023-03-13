@@ -7,7 +7,7 @@
 *+    Functions: Procedure USBeject()
 *+               Static Procedure EjectMedia()
 *+
-*+    Reformatted by Click! 2.05.40 on Mar-11-2023 at  8:22 am
+*+    Reformatted by Click! 2.05.40 on Mar-13-2023 at  6:37 am
 *+
 *+--------------------------------------------------------------------
 
@@ -16,6 +16,8 @@
 #include "dll.ch"
 
 #include "EJECTDLL.CH"
+
+STATIC lUse_IconEx := .T.
 
 MEMVAR oFontDefault
 MEMVAR oFontBig
@@ -32,30 +34,26 @@ MEMVAR bGradient
 *+
 PROCEDURE USBeject( nIcoLarge, nIcoSmall )
 
-LOCAL oDlg, oListbox, oIco
-LOCAL cDrive       := SPACE( 2 )
-LOCAL cTitle       := "Please, select"
-LOCAL aDrives      := FillDriveArray()
-LOCAL nStyle       := CBS_SIMPLE
+LOCAL oDlg, oGrid
+LOCAL WinDir    := GETENV( "Windir" )
+LOCAL cDLL      := WinDir + "\System32\imageres.dll"
+LOCAL cDrive    := SPACE( 2 )
+LOCAL cTitle    := "Please, select"
+LOCAL aDrives   := FillDriveArray()
+LOCAL cMsg      := ""
+LOCAL lPixel    := .T.
+LOCAL lDesign   := .F.
+LOCAL lChkBoxes := .F.
+LOCAL lDispInfo := .F.
+LOCAL aHeader   := {}
 LOCAL acItem
 LOCAL acBitmaps
 LOCAL acType
-LOCAL bChange
-LOCAL bValid
-LOCAL bLDblClicked
-LOCAL bWhen
-LOCAL bDrawItem
+LOCAL bAction
 LOCAL ii, iMax
-LOCAL oImageList, iImage, iImage_0, aItem, nFirstUSB := 0
-LOCAL oGrid, oBmp1, oButton1, oButton2
-LOCAL cMsg         := ""
-LOCAL lPixel       := .T.
-LOCAL lDesign      := .F.
-LOCAL lChkBoxes    := .F.
-LOCAL lDispInfo    := .F.
-LOCAL aHeader      := {}
-LOCAL nOption      := 1
-LOCAL bAction      := { | x | cDrive := acItem[ x ] }
+LOCAL iImage, iImage_0, aItem, nFirstUSB := 0
+LOCAL oBmp1, oButton1, oButton2
+LOCAL hModule, nResID, iRes
 
    DEFAULT nIcoLarge := 256                                           // 32
    DEFAULT nIcoSmall := 32                                            // 16
@@ -64,6 +62,9 @@ LOCAL bAction      := { | x | cDrive := acItem[ x ] }
    acBitmaps := aDrives[ 2 ]
    acType := aDrives[ 3 ]
    nFirstUSB := aDrives[ 4 ]
+
+   // init Codeblock here
+   bAction := { | x | cDrive := acItem[ x ] }
 
    DEFINE WINDOW oDlg FROM 0, 0 TO 400, 450 PIXEL TITLE cTitle ICON "A1MAIN" COLOR BFcolor, BGcolor NOMINIMIZE NOMAXIMIZE
 
@@ -92,16 +93,69 @@ LOCAL bAction      := { | x | cDrive := acItem[ x ] }
          FOR ii := 1 TO iMax
             aItem := { acItem[ ii ], STR( acType[ ii ] ) }
 
-            oBmp1 := TBitmap() :Define( acBitmaps[ ii ],, oDlg )
+            // use System Icon from DLL
+            IF lUse_IconEx = .T.
 
-            // "only" add "small"
-            iImage := oGrid:oImageListSmall:Add( oBmp1 )
-            // iImage_0 := MAX( 0, oGrid:oImageListBig:Add( oBmp1))
+               nResID := - 1
+               cDLL := WinDir + "\System32\imageres.dll"
+               DO CASE
+                  CASE acType[ ii ] = DRIVE_UNKNOWN
+                     nResID := 75
+                  CASE acType[ ii ] = DRIVE_NO_ROOT_DIR
+                     nResID := 32
+
+                  CASE acType[ ii ] = DRIVE_REMOVABLE
+                     IF SUBSTR( acItem[ ii ], 1, 1 ) $ "AB"
+                        nResID := 23
+                     ELSE
+                        // use other DLL
+                        cDLL := WinDir + "\System32\DDORes.dll"
+                        nResID := 2389
+                     ENDIF
+
+                  CASE acType[ ii ] = DRIVE_FIXED
+                     IF SUBSTR( acItem[ ii ], 1, 2 ) = "C:"
+                        nResID := 36
+                     ELSE
+                        nResID := 32
+                     ENDIF
+                  CASE acType[ ii ] = DRIVE_REMOTE
+                     nResID := 33
+                  CASE acType[ ii ] = DRIVE_CDROM
+                     nResID := 30
+                  CASE acType[ ii ] = DRIVE_RAMDISK
+                     nResID := 34
+
+               ENDCASE
+
+               hModule := GetModuleHandle( cDLL )
+               IF hModule == 0
+                  hModule := LoadLibrary( cDLL )
+               ENDIF
+               iRes := LOADIMAGERESICON( hModule, nResID, 256 )
+
+               ILAddIcon( oGrid:oImageListSmall:hImageList, iRes )
+               iImage := MAX( 0, ILAddIcon( oGrid:oImageListBig:hImageList, iRes ) )
+
+               DestroyIcon( iRes )
+               FreeLibrary( hModule )
+
+            ELSE
+
+               oBmp1 := TBitmap() :Define( acBitmaps[ ii ],, oDlg )
+
+               // "only" add "small"
+               iImage := oGrid:oImageListSmall:Add( oBmp1 )
+               // iImage_0 := MAX( 0, oGrid:oImageListBig:Add( oBmp1))
+
+            ENDIF
 
             LV_ADDITEMS( oGrid:hLv, aItem, iImage )
 
             DeleteObject( iImage )
-            DeleteObject( oBmp1 )
+            IF !EMPTY( oBmp1 )
+               DeleteObject( oBmp1 )
+            ENDIF
          NEXT
       ENDIF
 
@@ -130,7 +184,7 @@ LOCAL bAction      := { | x | cDrive := acItem[ x ] }
    oDlg:bKeyDown := { | nKey, nFlag | IF( nKey = VK_ESCAPE, oDlg:End(), IF( nKey = VK_RETURN, ( EjectMedia( cDrive ), oDlg:End() ), nil ) ) }
    oDlg:bResized := { | nType, nWidth, nHeight | oDlg:SetSize( 450, 400 ) }
 
-   ACTIVATE WINDOW oDlg CENTERED
+   ACTIVATE WINDOW oDlg CENTER
 
 RETURN
 
